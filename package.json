@@ -6,6 +6,8 @@
 	"author": "",
 	"devDependencies": {
 		"@types/node": "^12.6.3",
+		"@zerollup/ts-transform-paths": "^1.7.3",
+		"ttypescript": "^1.5.7",
 		"typescript": "^3.0.3",
 		"webpack": "^4.17.2",
 		"webpack-cli": "^3.1.0",
@@ -16,5 +18,8 @@
 		"open-simplex-noise": "^1.6.0",
 		"three": "^0.106.2",
 		"ts-loader": "^6.0.4"
+	},
+	"scripts": {
+		"build": "ttsc && webpack"
 	}
 }
