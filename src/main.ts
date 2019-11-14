@@ -31,52 +31,74 @@ window.addEventListener("resize", ()=>{
 
 const controls = new (<any>THREE).OrbitControls(camera, renderer.domElement);
 
-var light = new THREE.PointLight(0xffffff);
-light.position.set(12, 12, 18);
+const WIDTH = 512;
+const REGION_SIZE = 16;
+const WIDTH_REGIONS = WIDTH/REGION_SIZE;
+
+var light = new THREE.PointLight(0xFFFFFF, 0.33);
+light.position.set(24, 24, 36);
 scene.add(light);
 
-var ambientLight = new THREE.AmbientLight(0x666666);
-scene.add(ambientLight);
+// renderer.shadowMap.enabled = true;
+// renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const board = new Board(256, 256);
+var directionalLight = new THREE.DirectionalLight(0xFFFFFF);
+directionalLight.position.set(0, WIDTH/8, WIDTH);
+// directionalLight.castShadow = true;
+scene.add(directionalLight);
+
+
+// light.shadow.mapSize.width = 512;
+// light.shadow.mapSize.height = 512;
+// light.shadow.camera.near = 0.5;    // default
+// light.shadow.camera.far = 500;     // default
+
+// var ambientLight = new THREE.AmbientLight(0x666666);
+// scene.add(ambientLight);
+
+const board = new Board(""+Math.random(), WIDTH, WIDTH);
 
 var material = new THREE.MeshStandardMaterial(
 		{vertexColors: THREE.VertexColors, side: THREE.DoubleSide, metalness: 0, roughness: 1});
-var planeGeo = new THREE.PlaneGeometry(16, 16, 255, 255);
+var planeGeo = new THREE.PlaneGeometry(WIDTH_REGIONS, WIDTH_REGIONS, WIDTH-1, WIDTH-1);
 
 for (let i = 0; i < planeGeo.vertices.length; i++) {
 	let v = planeGeo.vertices[i];
-	v.z = board.heightmap[i%256][Math.floor(i/256)];
+	v.z = board.heightmap[i%WIDTH][Math.floor(i/WIDTH)]/REGION_SIZE;
 }
 for (let i = 0; i < planeGeo.faces.length; i++) {
 	let face = planeGeo.faces[i];
 
-	face.vertexColors = [board.colormap[face.a%256][Math.floor(face.a/256)],
-						 board.colormap[face.b%256][Math.floor(face.b/256)],
-						 board.colormap[face.c%256][Math.floor(face.c/256)]];
+	face.vertexColors = [board.colormap[face.a%WIDTH][Math.floor(face.a/WIDTH)],
+						 board.colormap[face.b%WIDTH][Math.floor(face.b/WIDTH)],
+						 board.colormap[face.c%WIDTH][Math.floor(face.c/WIDTH)]];
 }
 planeGeo.colorsNeedUpdate = true;
 var plane = new THREE.Mesh(planeGeo, material);
+// plane.castShadow = true;
+// plane.receiveShadow = true;
 scene.add(plane);
 
-var water = new THREE.PlaneGeometry(16, 16, 1, 1);
+var waterGeo = new THREE.PlaneGeometry(WIDTH_REGIONS, WIDTH_REGIONS, 1, 1);
 var waterMaterial = new THREE.MeshStandardMaterial(
 		{color: new THREE.Color(0x3333FF), side: THREE.DoubleSide, metalness: 0.2, roughness: 0.6});
-scene.add(new THREE.Mesh(water, waterMaterial));
+var water = new THREE.Mesh(waterGeo, waterMaterial);
+// water.castShadow = true;
+// water.receiveShadow = true;
+scene.add(water);
 
-// var grid = new THREE.GridHelper(10, 10);
-var gridXZ = new THREE.GridHelper(16, 16, new THREE.Color(0x006600), new THREE.Color(0x006600));
+var gridXZ = new THREE.GridHelper(WIDTH_REGIONS, WIDTH_REGIONS, new THREE.Color(0x006600), new THREE.Color(0x006600));
 // gridXZ.setColors( new THREE.Color(0x006600), new THREE.Color(0x006600) );
-gridXZ.position.set(0,-8,8);
+gridXZ.position.set(0,-WIDTH_REGIONS/2,WIDTH_REGIONS/2);
 scene.add(gridXZ);
 
-var gridXY = new THREE.GridHelper(16, 16, new THREE.Color(0x000066), new THREE.Color(0x000066));
+var gridXY = new THREE.GridHelper(WIDTH_REGIONS, WIDTH_REGIONS, new THREE.Color(0x000066), new THREE.Color(0x000066));
 // gridXY.position.set( 10,10,0 );
 gridXY.rotation.x = Math.PI/2;
 // gridXY.setColors( new THREE.Color(0x000066), new THREE.Color(0x000066) );
 scene.add(gridXY);
-var gridYZ = new THREE.GridHelper(16, 16, new THREE.Color(0x660000), new THREE.Color(0x660000));
-gridYZ.position.set(-8,0,8);
+var gridYZ = new THREE.GridHelper(WIDTH_REGIONS, WIDTH_REGIONS, new THREE.Color(0x660000), new THREE.Color(0x660000));
+gridYZ.position.set(-WIDTH_REGIONS/2,0,WIDTH_REGIONS/2);
 gridYZ.rotation.z = Math.PI/2;
 // gridYZ.setColors( new THREE.Color(0x660000), new THREE.Color(0x660000) );
 scene.add(gridYZ);
