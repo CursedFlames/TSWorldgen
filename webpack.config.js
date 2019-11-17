@@ -5,6 +5,7 @@ const path = require('path');
 module.exports = {
 	entry: {
 		"main": "./build/main.js",
+		"voronoi": "./build/voronoi_main.js"
 	},
 	output: {
 		path: __dirname + "/build",

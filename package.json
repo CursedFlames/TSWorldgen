@@ -12,14 +12,17 @@
 		"typescript": "^3.0.3",
 		"webpack": "^4.17.2",
 		"webpack-cli": "^3.1.0",
-		"wrapper-webpack-plugin": "^2.1.0"
+		"wrapper-webpack-plugin": "^2.1.0",
+		"@types/pixi.js": "^4.8.0"
 	},
 	"dependencies": {
 		"fractal-noise": "^0.9.0",
 		"open-simplex-noise": "^1.6.0",
 		"seedrandom": "^3.0.1",
 		"three": "^0.106.2",
-		"ts-loader": "^6.0.4"
+		"ts-loader": "^6.0.4",
+		"pixi-viewport": "^3.6.4",
+		"pixi.js": "^4.8.2"
 	},
 	"scripts": {
 		"build": "ttsc && webpack"
