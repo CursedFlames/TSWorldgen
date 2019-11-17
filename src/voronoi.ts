@@ -145,7 +145,7 @@ export class Voronoi {
 	// for testing
 	outerPoints: Vec2[] = [];
 	triangles: Triangle[] = [];
-	pointsLeft: Vec2[] = [];
+	// pointsLeft: Vec2[] = [];
 	clean = false;
 
 	cleanup(): void {
@@ -165,24 +165,27 @@ export class Voronoi {
 				i--;
 			}
 		}
+		this.clean = true;
 	}
 
-	step(): void {
-		if (this.pointsLeft.length === 0) {
-			if (this.clean) return;
-			this.cleanup();
-			this.clean = true;
-			return;
-		}
-		this.retriangulate(this.triangles, <Vec2> this.pointsLeft.pop());
-	}
+	// Testing only
+	// step(): void {
+	// 	if (this.pointsLeft.length === 0) {
+	// 		if (this.clean) return;
+	// 		this.cleanup();
+	// 		this.clean = true;
+	// 		return;
+	// 	}
+	// 	this.retriangulate(this.triangles, <Vec2> this.pointsLeft.pop());
+	// }
 
 	advanceRegionToRelaxations(x1: number, y1: number, x2: number, y2: number, relaxations: number): void {
 		if (x2 < x1 || y2 < y1) {
 			throw new Error("get your points around the right way, Cursed, you dumbass");
 		}
-		// let expandX = x2-x1 < 2;
-		// let expandY = y2-y1 < 2;
+		// ensure that we have at least a 5x5 area
+		// let expandX = x2-x1 < 4;
+		// let expandY = y2-y1 < 4;
 		// if (expandX || expandY) {
 		// 	return this.advanceRegionToRelaxations(expandX ? x1-1 : x1, expandY ? y1-1 : y1,
 		// 		expandX ? x2+1 : x2, expandY ? y2+1 : y2, relaxations);
@@ -209,31 +212,23 @@ export class Voronoi {
 			}
 		}
 		let triangles: Triangle[] = [new Triangle(outerPoints[0], outerPoints[1], outerPoints[2])];
-		// for (let point of points) {
-		// 	this.retriangulate(triangles, point);
-		// }
+		for (let point of points) {
+			this.retriangulate(triangles, point);
+		}
 		this.triangles = triangles;
-		this.pointsLeft = points;
+		// this.pointsLeft = points;
 		// TODO remember to prevent points crossing cell boundaries if it would leave a cell empty
 	}
 
 	retriangulate(triangles: Triangle[], point: Vec2) {
-		console.log("Doing retriangulation step");
 		let badTriangles: Triangle[] = [];
-		// TODO when moving to Java, make this a set so we don't need sorting and removing
 		let polygonHole: Edge[] = [];
-		console.log("Start tris: " + triangles.length);
 		this.findInvalidatedTriangles(triangles, point, badTriangles);
 		this.polygonHoleFromBadTriangles(badTriangles, polygonHole);
-		// this.removeDuplicatedEdges(polygonHole);
-		console.log("bad triangles: ")
-		console.log(badTriangles);
 		for (let triangle of badTriangles) {
 			triangles.splice(triangles.indexOf(triangle), 1);
 		}
-		console.log("After removing bad: " + triangles.length);
 		this.fillPolygonHole(triangles, point, polygonHole);
-		console.log("End tris: " + triangles.length);
 	}
 
 	pointInCircumcircle(triangle: Triangle, point: Vec2): boolean {
@@ -274,22 +269,6 @@ export class Voronoi {
 		for (let triangle of triangles) {
 			if (this.pointInCircumcircle(triangle, point)) {
 				badTriangles.push(triangle);
-				let edges = [triangle.edge1, triangle.edge2, triangle.edge3];
-				let oppVertices = [];
-				for (let i = 0; i < 3; i++) {
-					let edge = edges[i];
-					// TODO make ordering of edges and points in triangles deterministic,
-					// so we don't need this
-					if (triangle.vert1 !== edge.point1 && triangle.vert1 !== edge.point2) {
-						oppVertices.push(triangle.vert1);
-					} else if (triangle.vert2 !== edge.point1 && triangle.vert2 !== edge.point2) {
-						oppVertices.push(triangle.vert2);
-					} else if (triangle.vert3 !== edge.point1 && triangle.vert3 !== edge.point2) {
-						oppVertices.push(triangle.vert3);
-					} else {
-						throw new Error("AAAAAAAAAAAAAAA");
-					}
-				}
 			}
 		}
 	}
@@ -316,41 +295,7 @@ export class Voronoi {
 		}
 	}
 
-	removeDuplicatedEdges(edges: Edge[]) {
-		for (let edge of edges) {
-			if (edge.point2.x < edge.point1.x) {
-				edge.point1, edge.point2 = edge.point2, edge.point1;
-			} else if (edge.point2.x == edge.point1.x && edge.point2.y < edge.point1.y) {
-				edge.point1, edge.point2 = edge.point2, edge.point1;
-			}
-		}
-		// Is sorting really necessary here? O(n^2) brute force check vs O(n log n) with sorting
-		// Ideally we'd kill duplicates during sorting, but ehhhhh
-		// edges.sort((a, b)=> {
-		// 	if (a.point1.x - b.point1.x !== 0) return a.point1.x - b.point1.x;
-		// 	if (a.point2.x - b.point2.x !== 0) return a.point2.x - b.point2.x;
-		// 	if (a.point1.y - b.point1.y !== 0) return a.point1.y - b.point1.y;
-		// 	return a.point2.y - b.point2.y;
-		// });
-		// for (let i = 1; i < edges.length; i++) {
-		// 	if (edges[i].equals(edges[i-1])) {
-		// 		edges.splice(i, 1);
-		// 		i--;
-		// 	}
-		// }
-		for (let i = 0; i < edges.length; i++) {
-			for (let j = i+1; j < edges.length; j++) {
-				if (edges[i].equals(edges[j])) {
-					edges.splice(j, 1);
-					j--;
-				}
-			}
-		}
-	}
-
 	fillPolygonHole(triangles: Triangle[], point: Vec2, polygonHole: Edge[]) {
-		console.log("polygon hole: ");
-		console.log(polygonHole);
 		for (let edge of polygonHole) {
 			let triangle = new Triangle(edge.point1, edge.point2, point);
 			triangles.push(triangle);

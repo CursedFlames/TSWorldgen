@@ -21,12 +21,16 @@ viewport.drag().wheel().decelerate();
 
 let cells: VoronoiGridCell[] = [];
 let points: DelaunayPoint[] = [];
-for (let x = -1; x <= 1; x++) {
-	for (let y = -1; y <= 1; y++) {
+let startX = -4;
+let startY = -4;
+let endX = 4;
+let endY = 4;
+for (let x = startX; x <= endX; x++) {
+	for (let y = startY; y <= endY; y++) {
 		cells.push(voronoi.addCell(x, y));
 	}
 }
-// points.push(new DelaunayPoint(11000, 11000, <any>{x: 0, y: 0}));
+
 for (let cell of cells) {
 	points.push(...cell.delaunayPoints);
 }
@@ -38,7 +42,9 @@ for (let point of points) {
 	graphic.endFill();
 }
 viewport.addChild(graphic);
-voronoi.advanceRegionToRelaxations(-1, -1, 1, 1, 1);
+voronoi.advanceRegionToRelaxations(startX, startY, endX, endY, 1);
+voronoi.cleanup();
+voronoi.clean = true;
 let graphic2 = new PIXI.Graphics();
 viewport.addChild(graphic2);
 
@@ -52,30 +58,28 @@ for (let triangle of voronoi.triangles) {
 			.lineTo(triangle.edge3.point2.x, triangle.edge3.point2.y);
 }
 
-// voronoi.pointsLeft = [new Vec2(11000, 11000)];
-
 let showCircles = false;
 
 document.addEventListener("keypress", (event)=>{
-	if (event.key === "s") {
-		for (let triangle of voronoi.triangles) {
-			let obj = <any> triangle;
-			if (obj.isNew) {
-				obj.isNew = false;
-			}
-		}
-		voronoi.step();
-		for (let triangle of voronoi.triangles) {
-			let obj = <any> triangle;
-			if (obj.isNew == null) {
-				obj.isNew = true;
-			}
-		}
-	}
+	// if (event.key === "s") {
+	// 	for (let triangle of voronoi.triangles) {
+	// 		let obj = <any> triangle;
+	// 		if (obj.isNew) {
+	// 			obj.isNew = false;
+	// 		}
+	// 	}
+	// 	voronoi.step();
+	// 	for (let triangle of voronoi.triangles) {
+	// 		let obj = <any> triangle;
+	// 		if (obj.isNew == null) {
+	// 			obj.isNew = true;
+	// 		}
+	// 	}
+	// }
 	if (event.key === "c") {
 		showCircles = !showCircles;
 	}
-	if (event.key === "s" || event.key === "c") {
+	if (/*event.key === "s" || */event.key === "c") {
 		graphic2.clear();
 		for (let triangle of voronoi.triangles) {
 			let color = Math.floor(Math.random()*0x1000000);
@@ -86,7 +90,7 @@ document.addEventListener("keypress", (event)=>{
 					.lineTo(triangle.edge2.point2.x, triangle.edge2.point2.y)
 					.moveTo(triangle.edge3.point1.x, triangle.edge3.point1.y)
 					.lineTo(triangle.edge3.point2.x, triangle.edge3.point2.y);
-			if (showCircles && (<any> triangle).isNew) {
+			if (showCircles) {
 				let [ax, ay] = [triangle.vert1.x, triangle.vert1.y];
 				let [bx, by] = [triangle.vert2.x, triangle.vert2.y];
 				let [cx, cy] = [triangle.vert3.x, triangle.vert3.y];
