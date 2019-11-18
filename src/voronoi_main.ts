@@ -44,6 +44,11 @@ for (let point of points) {
 viewport.addChild(graphic);
 let triangles = voronoi.advanceRegionToRelaxations(startX, startY, endX, endY, 1);
 let voronoiEdges = voronoi.toVoronoi(triangles);
+let barycentricDualMesh = voronoi.toDualMesh(triangles, t=>{
+	let x = (t.vert1.x+t.vert2.x+t.vert3.x)/3;
+	let y = (t.vert1.y+t.vert2.y+t.vert3.y)/3;
+	return new Vec2(x, y);
+});
 voronoi.cleanup();
 voronoi.clean = true;
 let graphic2 = new PIXI.Graphics();
@@ -52,8 +57,11 @@ viewport.addChild(graphic2);
 let showCircles = false;
 let showDelaunay = true;
 let showVoronoi = true;
+let showBarycentric = false;
+
 let delaunayColor = 0xFF0000;
 let voronoiColor = 0x00FF00;
+let barycentricColor = 0x0000FF;
 
 function redraw() {
 	graphic2.clear();
@@ -94,6 +102,13 @@ function redraw() {
 					.lineTo(edge.point2.x, edge.point2.y);
 		}
 	}
+	if (showBarycentric) {
+		for (let edge of barycentricDualMesh) {
+			graphic2.lineStyle(75, barycentricColor)
+					.moveTo(edge.point1.x, edge.point1.y)
+					.lineTo(edge.point2.x, edge.point2.y);			
+		}
+	}
 }
 
 document.addEventListener("keypress", (event)=>{
@@ -106,7 +121,12 @@ document.addEventListener("keypress", (event)=>{
 	if (event.key === "v") {
 		showVoronoi = !showVoronoi;
 	}
-	if (event.key === "c" || event.key === "d" || event.key === "v") {
+	if (event.key === "b") {
+		showBarycentric = !showBarycentric;
+	}
+	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "b") {
 		redraw();
 	}
 });
+
+redraw();

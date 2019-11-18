@@ -331,7 +331,7 @@ export class Voronoi {
 		}
 	}
 
-	toVoronoi(triangles: Triangle[]) {
+	toDualMesh(triangles: Triangle[], getTriangleCenter: (t: Triangle)=>Vec2) {
 		let edges: TriEdge[] = [];
 		for (let i = 0; i < triangles.length; i++) {
 			let triangle = triangles[i];
@@ -355,10 +355,14 @@ export class Voronoi {
 		for (let edge of edges) {
 			let triangle1 = edge.triangle1;
 			let triangle2 = edge.triangle2;
-			let center1 = triangle1.circumcenter();
-			let center2 = triangle2.circumcenter();
+			let center1 = getTriangleCenter(triangle1);
+			let center2 = getTriangleCenter(triangle2);
 			voronoiEdges.push(new Edge(center1, center2));
 		}
 		return voronoiEdges;
+	}
+
+	toVoronoi(triangles: Triangle[]) {
+		return this.toDualMesh(triangles, t=>t.circumcenter());
 	}
 }
