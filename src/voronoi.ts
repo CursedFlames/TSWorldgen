@@ -78,11 +78,25 @@ export class Edge {
 		|| (this.point2.equals(other.point1) && this.point1.equals(other.point2)));
 	}
 }
+export class TriEdge extends Edge {
+	constructor(point1: Vec2, point2: Vec2, public triangle1: Triangle, public triangle2: Triangle) {
+		super(point1, point2);
+	}
+	// remove this so only compares points, not triangles
+	// equals(other: TriEdge): boolean {
+	// 	if (other == null) return false;
+	// 	// assume that triangles are unique, so any identical triangles will be refs to the same object
+	// 	if (this.triangle2 == null)
+	// 		return other.triangle2 == null && this.triangle1 == other.triangle1;
+	// 	return ((this.triangle1 === other.triangle1 && this.triangle2 === other.triangle2)
+	// 		|| (this.triangle2 === other.triangle1 && this.triangle1 === other.triangle2));
+	// }
+}
 export class Triangle {
 	edge1: Edge;
 	edge2: Edge;
 	edge3: Edge;
-	constructor (public vert1: Vec2, public vert2: Vec2, public vert3: Vec2) {
+	constructor(public vert1: Vec2, public vert2: Vec2, public vert3: Vec2) {
 		// force counterclockwise triangle
 		if ((this.vert2.x - this.vert1.x)
 		   *(this.vert3.y - this.vert1.y)
@@ -93,6 +107,19 @@ export class Triangle {
 		this.edge1 = new Edge(vert1, vert2);
 		this.edge2 = new Edge(vert2, vert3);
 		this.edge3 = new Edge(vert3, vert1);
+	}
+
+	circumcenter(): Vec2 {
+		let [ax, ay] = [this.vert1.x, this.vert1.y];
+		let [bx, by] = [this.vert2.x, this.vert2.y];
+		let [cx, cy] = [this.vert3.x, this.vert3.y];
+		let D = 2 * (ax*(by-cy) + bx*(cy-ay) + cx*(ay-by));
+		let ad = ax*ax + ay*ay;
+		let bd = bx*bx + by*by;
+		let cd = cx*cx + cy*cy;
+		let x = (ad*(by-cy) + bd*(cy-ay) + cd*(ay-by))/D;
+		let y =-(ad*(bx-cx) + bd*(cx-ax) + cd*(ax-bx))/D;
+		return new Vec2(x, y);
 	}
 }
 export class VoronoiGridCell {
@@ -179,7 +206,8 @@ export class Voronoi {
 	// 	this.retriangulate(this.triangles, <Vec2> this.pointsLeft.pop());
 	// }
 
-	advanceRegionToRelaxations(x1: number, y1: number, x2: number, y2: number, relaxations: number): void {
+	advanceRegionToRelaxations(
+			x1: number, y1: number, x2: number, y2: number, relaxations: number): Triangle[] {
 		if (x2 < x1 || y2 < y1) {
 			throw new Error("get your points around the right way, Cursed, you dumbass");
 		}
@@ -217,6 +245,7 @@ export class Voronoi {
 		}
 		this.triangles = triangles;
 		// this.pointsLeft = points;
+		return triangles;
 		// TODO remember to prevent points crossing cell boundaries if it would leave a cell empty
 	}
 
@@ -300,5 +329,36 @@ export class Voronoi {
 			let triangle = new Triangle(edge.point1, edge.point2, point);
 			triangles.push(triangle);
 		}
+	}
+
+	toVoronoi(triangles: Triangle[]) {
+		let edges: TriEdge[] = [];
+		for (let i = 0; i < triangles.length; i++) {
+			let triangle = triangles[i];
+			let triangleEdges = [triangle.edge1, triangle.edge2, triangle.edge3];
+			edgeloop:
+			for (let triangleEdge of triangleEdges) {
+				for (let j = i+1; j < triangles.length; j++) {
+					let triangle2 = triangles[j];
+					let triangle2Edges = [triangle2.edge1, triangle2.edge2, triangle2.edge3];
+					for (let triangle2Edge of triangle2Edges) {
+						if (triangleEdge.equals(triangle2Edge)) {
+							edges.push(new TriEdge(triangleEdge.point1, triangleEdge.point2,
+								triangle, triangle2));
+							continue edgeloop;
+						}
+					}
+				}
+			}
+		}
+		let voronoiEdges: Edge[] = [];
+		for (let edge of edges) {
+			let triangle1 = edge.triangle1;
+			let triangle2 = edge.triangle2;
+			let center1 = triangle1.circumcenter();
+			let center2 = triangle2.circumcenter();
+			voronoiEdges.push(new Edge(center1, center2));
+		}
+		return voronoiEdges;
 	}
 }
