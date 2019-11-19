@@ -4,22 +4,158 @@ export class Vec2 {
 	constructor(public x: number, public y: number) {}
 }
 
+export class VorPoint extends Vec2 {
+	edges: VorEdge[] = [];
+	// TODO do we want a ref to the Triangle here?
+	// static of(point: Vec2): VorPoint {
+	// 	return new VorPoint(point.x, point.y);
+	// }
+	static fromTriangle(triangle: Triangle): VorPoint {
+		if (triangle.vorPoint != null) {
+			console.warn("Tried to make Voronoi point for triangle that already had a Voronoi point");
+			return triangle.vorPoint;
+		}
+		let pos = triangle.circumcenter();
+		let point = new VorPoint(pos.x, pos.y);
+		triangle.vorPoint = point;
+		return point;
+	}
+}
+
+export class VorEdge {
+	cell1?: VorCell | null;
+	cell2?: VorCell | null;
+	// TODO do we want a ref to the TriEdge here?
+
+	private constructor(public vert1: VorPoint, public vert2: VorPoint) {
+		vert1.edges.push(this);
+		vert2.edges.push(this);
+	}
+
+	// static of(vert1: VorPoint, vert2: VorPoint): VorEdge {
+	// 	// If we used numerical ids we could have a dict instead of doing this check - would it be worth it?
+	// 	for (let edge of vert1.edges) {
+	// 		if (edge.vert1 === vert1 && edge.vert2 === vert2
+	// 				|| edge.vert1 === vert2 && edge.vert2 === vert1) {
+	// 			return edge;
+	// 		}
+	// 	}
+	// 	return new VorEdge(vert1, vert2);
+	// }
+
+	static fromTriEdge(triEdge: TriEdge): VorEdge | null {
+		if (triEdge.vorEdge !== undefined) {
+			console.warn("Tried to make Voronoi edge for triangle edge that already had a Voronoi edge");
+			return triEdge.vorEdge;
+		}
+		if (triEdge.triangle1 == null || triEdge.triangle2 == null) {
+			triEdge.vorEdge = null;
+			console.warn("Tried to make Voronoi edge for triangle edge that didn't have two triangles");
+			return null;
+		}
+		let point1 = triEdge.triangle1.vorPoint == null
+					 ? VorPoint.fromTriangle(triEdge.triangle1)
+					 : triEdge.triangle1.vorPoint;
+		let point2 = triEdge.triangle2.vorPoint == null
+		             ? VorPoint.fromTriangle(triEdge.triangle2)
+					 : triEdge.triangle2.vorPoint;
+		let edge = new VorEdge(point1, point2);
+		triEdge.vorEdge = edge;
+		return edge;
+	}
+
+	// /**
+	//  * Does *not* handle removal of cells, so this should only be called by VorCell.
+	//  */
+	// destroy(): void {
+	// 	let ind = this.vert1.edges.indexOf(this);
+	// 	if (ind !== -1) this.vert1.edges.splice(ind, 1);
+	// 	ind = this.vert2.edges.indexOf(this);
+	// 	if (ind !== -1) this.vert2.edges.splice(ind, 1);
+	// }
+
+	addCell(cell: VorCell): void {
+		if (this.cell1 == null) {
+			this.cell1 = cell; return;
+		} else if (this.cell2 == null) {
+			this.cell2 = cell; return;
+		} else {
+			throw new Error("edge with three cells");
+		}
+	}
+	// Probably don't need this?
+	// removeCell(cell: VorCell): void {
+	// 	if (cell == this.cell1) {
+	// 		this.cell1 = this.cell2;
+	// 		this.cell2 = null;
+	// 	} else if (cell == this.cell2) {
+	// 		this.cell2 = null;
+	// 	} else {
+	// 		console.warn("Tried to cell triangle that isn't on edge");
+	// 	}
+	// }
+}
+
+export class VorCell {
+	edges: VorEdge[] = [];
+	verts: VorPoint[] = [];
+	isComplete: boolean = true;
+	private constructor(public point?: TriPoint) {}
+	static fromTriPoint(point: TriPoint): VorCell | null {
+		if (point.vorCell !== undefined) {
+			console.warn("Tried to make Voronoi cell for point that already had a cell");
+			return point.vorCell;
+		}
+		let cell = new VorCell(point);
+		point.vorCell = cell;
+		for (let edge of point.edges) {
+			if (edge.triangle1 == null || edge.triangle2 == null) {
+				point.vorCell = null;
+				return null;
+			}
+		}
+		for (let edge of point.edges) {
+			if (edge.vorEdge !== undefined) {
+				cell.addEdge(edge.vorEdge);
+			} else {
+				cell.addEdge(VorEdge.fromTriEdge(edge));
+			}
+		}
+		return cell;
+	}
+	addEdge(edge: VorEdge | null): void {
+		if (edge == null) {
+			this.isComplete = false;
+			return;
+		}
+		this.edges.push(edge);
+		if (this.verts.indexOf(edge.vert1) === -1)
+			this.verts.push(edge.vert1);
+		if (this.verts.indexOf(edge.vert2) === -1)
+			this.verts.push(edge.vert2);
+		edge.addCell(this);
+	}
+}
+
 export class TriPoint extends Vec2 {
-	edges: Edge[] = [];
+	edges: TriEdge[] = [];
+	vorCell?: VorCell | null;
 	static of(point: Vec2): TriPoint {
 		return new TriPoint(point.x, point.y);
 	}
 }
 
-export class Edge {
+export class TriEdge {
 	triangle1?: Triangle | null;
 	triangle2?: Triangle | null;
+	vorEdge?: VorEdge | null;
+
 	private constructor(public vert1: TriPoint, public vert2: TriPoint) {
 		vert1.edges.push(this);
 		vert2.edges.push(this);
 	}
 
-	static of(vert1: TriPoint, vert2: TriPoint): Edge {
+	static of(vert1: TriPoint, vert2: TriPoint): TriEdge {
 		// If we used numerical ids we could have a dict instead of doing this check - would it be worth it?
 		for (let edge of vert1.edges) {
 			if (edge.vert1 === vert1 && edge.vert2 === vert2
@@ -27,7 +163,7 @@ export class Edge {
 				return edge;
 			}
 		}
-		return new Edge(vert1, vert2);
+		return new TriEdge(vert1, vert2);
 	}
 
 	/**
@@ -63,8 +199,9 @@ export class Edge {
 }
 
 export class Triangle {
+	vorPoint?: VorPoint;
 	constructor(public vert1: TriPoint, public vert2: TriPoint, public vert3: TriPoint,
-		public edge1: Edge, public edge2: Edge, public edge3: Edge) {
+		public edge1: TriEdge, public edge2: TriEdge, public edge3: TriEdge) {
 		// force counterclockwise triangle
 		if ((this.vert2.x - this.vert1.x)
 		   *(this.vert3.y - this.vert1.y)
@@ -102,22 +239,22 @@ export class Triangle {
 }
 
 export class DelaunayTriangulator {
-	doTriangulation(points: Vec2[], startX: number, startY: number, endX: number, endY: number): Triangle[] {
+	doTriangulation(points: TriPoint[], startX: number, startY: number, endX: number, endY: number): Triangle[] {
 		let outerPoints = [
 			new TriPoint(startX-1, startY-1),
 			new TriPoint(4*endX-3*startX+1, startY-1),
 			new TriPoint(startX-1, 4*endY-3*startY+1)
 		];
 		let outerEdges = [
-			Edge.of(outerPoints[1], outerPoints[2]),
-			Edge.of(outerPoints[2], outerPoints[0]),
-			Edge.of(outerPoints[0], outerPoints[1])
+			TriEdge.of(outerPoints[1], outerPoints[2]),
+			TriEdge.of(outerPoints[2], outerPoints[0]),
+			TriEdge.of(outerPoints[0], outerPoints[1])
 		];
 		let baseTriangle = new Triangle(
 			outerPoints[0], outerPoints[1], outerPoints[2], outerEdges[0], outerEdges[1], outerEdges[2]);
 		let triangles = [baseTriangle];
 		for (let point of points) {
-			this.retriangulate(triangles, TriPoint.of(point));
+			this.retriangulate(triangles, point);
 		}
 		return triangles; // TODO remove base triangle?
 	}
@@ -175,8 +312,8 @@ export class DelaunayTriangulator {
 		return badTriangles;
 	}
 
-	makePolygonHole(badTriangles: Triangle[]): Edge[] {
-		let polygonHole: Edge[] = [];
+	makePolygonHole(badTriangles: Triangle[]): TriEdge[] {
+		let polygonHole: TriEdge[] = [];
 		for (let triangle of badTriangles) {
 			let edges = [triangle.edge1, triangle.edge2, triangle.edge3];
 			for (let edge of edges) {
@@ -199,10 +336,10 @@ export class DelaunayTriangulator {
 		return polygonHole;
 	}
 
-	fillPolygonHole(triangles: Triangle[], point: TriPoint, polygonHole: Edge[]) {
+	fillPolygonHole(triangles: Triangle[], point: TriPoint, polygonHole: TriEdge[]) {
 		for (let edge of polygonHole) {
 			let triangle = new Triangle(edge.vert1, edge.vert2, point,
-				Edge.of(point, edge.vert2), Edge.of(point, edge.vert1), edge);
+				TriEdge.of(point, edge.vert2), TriEdge.of(point, edge.vert1), edge);
 			triangles.push(triangle);
 		}
 	}

@@ -1,5 +1,5 @@
-import { Voronoi, VoronoiGridCell, DelaunayPoint, Vec2 } from "src/voronoi";
-import { DelaunayTriangulator, TriPoint } from "src/voronoi2";
+import { Voronoi, VoronoiGridCell, DelaunayPoint } from "src/voronoi";
+import { DelaunayTriangulator, TriPoint, VorCell } from "src/voronoi2";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 
@@ -45,30 +45,31 @@ for (let point of points) {
 viewport.addChild(graphic);
 const triangulator = new DelaunayTriangulator();
 let points2 = voronoi.getPoints(startX, startY, endX, endY);
+let points3: TriPoint[] = [];
+for (let point of points2) {
+	points3.push(TriPoint.of(point));
+}
 let triangles = triangulator.doTriangulation(
-	points2,
+	points3,
 	startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
 	endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
-// let triangles = voronoi.advanceRegionToRelaxations(startX, startY, endX, endY, 1);
-// let voronoiEdges = voronoi.toVoronoi(triangles);
-// let barycentricDualMesh = voronoi.toDualMesh(triangles, t=>{
-// 	let x = (t.vert1.x+t.vert2.x+t.vert3.x)/3;
-// 	let y = (t.vert1.y+t.vert2.y+t.vert3.y)/3;
-// 	return new Vec2(x, y);
-// });
-// voronoi.cleanup();
-// voronoi.clean = true;
+let voronoiCells: VorCell[] = [];
+for (let point of points3) {
+	let cell = VorCell.fromTriPoint(point);
+	if (cell != null) {
+		voronoiCells.push(cell);
+	}
+}
+
 let graphic2 = new PIXI.Graphics();
 viewport.addChild(graphic2);
 
 let showCircles = false;
 let showDelaunay = true;
 let showVoronoi = true;
-let showBarycentric = false;
 
 let delaunayColor = 0xFF0000;
 let voronoiColor = 0x00FF00;
-let barycentricColor = 0x0000FF;
 
 function redraw() {
 	graphic2.clear();
@@ -102,20 +103,16 @@ function redraw() {
 			graphic2.endFill();
 		}
 	}
-	// if (showVoronoi) {
-	// 	for (let edge of voronoiEdges) {
-	// 		graphic2.lineStyle(75, voronoiColor)
-	// 				.moveTo(edge.point1.x, edge.point1.y)
-	// 				.lineTo(edge.point2.x, edge.point2.y);
-	// 	}
-	// }
-	// if (showBarycentric) {
-	// 	for (let edge of barycentricDualMesh) {
-	// 		graphic2.lineStyle(75, barycentricColor)
-	// 				.moveTo(edge.point1.x, edge.point1.y)
-	// 				.lineTo(edge.point2.x, edge.point2.y);			
-	// 	}
-	// }
+	if (showVoronoi) {
+		for (let cell of voronoiCells) {
+			let color = Math.floor(Math.random()*0x1000000);
+			for (let edge of cell.edges) {
+				graphic2.lineStyle(75, color)
+						.moveTo(edge.vert1.x, edge.vert1.y)
+						.lineTo(edge.vert2.x, edge.vert2.y);
+			}
+		}
+	}
 }
 
 document.addEventListener("keypress", (event)=>{
@@ -128,14 +125,10 @@ document.addEventListener("keypress", (event)=>{
 	if (event.key === "v") {
 		showVoronoi = !showVoronoi;
 	}
-	if (event.key === "b") {
-		showBarycentric = !showBarycentric;
-	}
 	// if (event.key === "s") {
 	// 	triangulator.retriangulate(triangles, TriPoint.of(<any>points2.pop()));
 	// }
-	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "b"
-	    || event.key === "s") {
+	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "s") {
 		redraw();
 	}
 });
