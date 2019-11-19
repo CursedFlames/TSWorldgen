@@ -2,6 +2,13 @@
 
 export class Vec2 {
 	constructor(public x: number, public y: number) {}
+	
+	/**
+	 * Includes if exactly on edge.
+	 */
+	inAreaInclusive(x1: number, y1: number, x2: number, y2: number): boolean {
+		return this.x >= x1 && this.x <= x2 && this.y >= y1 && this.y <= y2;
+	}
 }
 
 export class VorPoint extends Vec2 {
@@ -99,6 +106,7 @@ export class VorEdge {
 export class VorCell {
 	edges: VorEdge[] = [];
 	verts: VorPoint[] = [];
+	centroid?: Vec2;
 	isComplete: boolean = true;
 	private constructor(public point?: TriPoint) {}
 	static fromTriPoint(point: TriPoint): VorCell | null {
@@ -108,6 +116,7 @@ export class VorCell {
 		}
 		let cell = new VorCell(point);
 		point.vorCell = cell;
+		// point.sortEdges(); // Probably not necessary?
 		for (let edge of point.edges) {
 			if (edge.triangle1 == null || edge.triangle2 == null) {
 				point.vorCell = null;
@@ -121,8 +130,10 @@ export class VorCell {
 				cell.addEdge(VorEdge.fromTriEdge(edge));
 			}
 		}
+		cell.sortVerts();
 		return cell;
 	}
+
 	addEdge(edge: VorEdge | null): void {
 		if (edge == null) {
 			this.isComplete = false;
@@ -135,6 +146,62 @@ export class VorCell {
 			this.verts.push(edge.vert2);
 		edge.addCell(this);
 	}
+
+	sortVerts(): void {
+		if (this.point == null) {
+			console.warn("Tried to sort voronoi verts without TriPoint");
+			return;
+		}
+		let center = this.point;
+		this.verts.sort((a, b)=>{
+			// blatantly copied from stackoverflow
+			// https://stackoverflow.com/a/6989383
+			// also inverted so that edges go in ccw order instead of cw
+			if (a.x - center.x >= 0 && b.x - center.x < 0)
+				return 1;
+			if (a.x - center.x < 0 && b.x - center.x >= 0)
+				return -1;
+			if (a.x - center.x == 0 && b.x - center.x == 0) {
+				if (a.y - center.y >= 0 || b.y - center.y >= 0)
+					return a.y - b.y;
+				return b.y - a.y;
+			}
+
+			// compute the cross product of vectors (center -> a) x (center -> b)
+			let det = (a.x - center.x) * (b.y - center.y) - (b.x - center.x) * (a.y - center.y);
+			return -det;
+		});
+	}
+
+	getCentroid(): Vec2 {
+		if (this.centroid != null) {
+			return this.centroid;
+		}
+		let centroid = new Vec2(0, 0);
+		let signedArea = 0;
+		for (let i = 0; i < this.verts.length; i++) {
+			let x1 = this.verts[i].x;
+			let y1 = this.verts[i].y;
+			let x2: number, y2: number;
+			if (i === this.verts.length-1) {
+				x2 = this.verts[0].x;
+				y2 = this.verts[0].y;				
+			} else {
+				x2 = this.verts[i+1].x;
+				y2 = this.verts[i+1].y;
+			}
+			let a = x1*y2 - x2*y1;
+			signedArea += a;
+			centroid.x += (x1+x2)*a;
+			centroid.y += (y1+y2)*a;
+		}
+		signedArea *= 0.5;
+		centroid.x /= (6*signedArea);
+		centroid.y /= (6*signedArea);
+
+		this.centroid = centroid;
+		return centroid;
+	}
 }
 
 export class TriPoint extends Vec2 {
@@ -142,6 +209,29 @@ export class TriPoint extends Vec2 {
 	vorCell?: VorCell | null;
 	static of(point: Vec2): TriPoint {
 		return new TriPoint(point.x, point.y);
+	}
+	sortEdges(): void {
+		this.edges.sort((edgeA, edgeB)=>{
+			// blatantly copied from stackoverflow
+			// https://stackoverflow.com/a/6989383
+			// also inverted so that edges go in ccw order instead of cw
+			// it should be ccw, I think, at least. idk
+			let a = edgeA.vert1 == this ? edgeA.vert2 : edgeA.vert1;
+			let b = edgeB.vert1 == this ? edgeB.vert2 : edgeB.vert1;
+			if (a.x - this.x >= 0 && b.x - this.x < 0)
+				return 1;
+			if (a.x - this.x < 0 && b.x - this.x >= 0)
+				return -1;
+			if (a.x - this.x == 0 && b.x - this.x == 0) {
+				if (a.y - this.y >= 0 || b.y - this.y >= 0)
+					return a.y - b.y;
+				return b.y - a.y;
+			}
+
+			// compute the cross product of vectors (center -> a) x (center -> b)
+			let det = (a.x - this.x) * (b.y - this.y) - (b.x - this.x) * (a.y - this.y);
+			return -det;
+		});
 	}
 }
 
@@ -196,6 +286,20 @@ export class TriEdge {
 			console.warn("Tried to remove triangle that isn't on edge");
 		}
 	}
+}
+
+export function cullVorCellsToArea(cells: VorCell[],
+		x1: number, y1: number, x2: number, y2: number): VorCell[] {
+	let outCells = [];
+	for (let cell of cells) {
+		for (let vert of cell.verts) {
+			if (vert.inAreaInclusive(x1, y1, x2, y2)) {
+				outCells.push(cell);
+				break;
+			}
+		}
+	}
+	return outCells;
 }
 
 export class Triangle {

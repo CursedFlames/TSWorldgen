@@ -1,5 +1,5 @@
 import { Voronoi, VoronoiGridCell, DelaunayPoint } from "src/voronoi";
-import { DelaunayTriangulator, TriPoint, VorCell } from "src/voronoi2";
+import { DelaunayTriangulator, TriPoint, VorCell, cullVorCellsToArea, Triangle } from "src/voronoi2";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 
@@ -22,10 +22,10 @@ viewport.drag().wheel().decelerate();
 
 let cells: VoronoiGridCell[] = [];
 let points: DelaunayPoint[] = [];
-let startX = -2;
-let startY = -2;
-let endX = 2;
-let endY = 2;
+let startX = -3;
+let startY = -3;
+let endX = 3;
+let endY = 3;
 for (let x = startX; x <= endX; x++) {
 	for (let y = startY; y <= endY; y++) {
 		cells.push(voronoi.addCell(x, y));
@@ -46,18 +46,37 @@ viewport.addChild(graphic);
 const triangulator = new DelaunayTriangulator();
 let points2 = voronoi.getPoints(startX, startY, endX, endY);
 let points3: TriPoint[] = [];
-for (let point of points2) {
-	points3.push(TriPoint.of(point));
-}
-let triangles = triangulator.doTriangulation(
-	points3,
-	startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
-	endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+let triangles: Triangle[] = [];
 let voronoiCells: VorCell[] = [];
-for (let point of points3) {
-	let cell = VorCell.fromTriPoint(point);
-	if (cell != null) {
-		voronoiCells.push(cell);
+function doVoronoiStep() {
+	points3 = [];
+	for (let point of points2) {
+		points3.push(new TriPoint(point.x, point.y));
+	}
+	triangles = triangulator.doTriangulation(
+		points3,
+		startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
+		endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+	voronoiCells = [];
+	for (let point of points3) {
+		let cell = VorCell.fromTriPoint(point);
+		if (cell != null) {
+			voronoiCells.push(cell);
+		}
+	}
+	startX += 2;
+	startY += 2;
+	endX -= 2;
+	endY -= 2;
+	voronoiCells = cullVorCellsToArea(voronoiCells,
+		startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
+		endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+}
+
+function relaxPoints() {
+	points2 = [];
+	for (let cell of voronoiCells) {
+		// points2.push(cell)
 	}
 }
 
@@ -111,6 +130,10 @@ function redraw() {
 						.moveTo(edge.vert1.x, edge.vert1.y)
 						.lineTo(edge.vert2.x, edge.vert2.y);
 			}
+			let centroid = cell.getCentroid();
+			graphic2.beginFill(color);
+			graphic2.drawCircle(centroid.x, centroid.y, 100);
+			graphic2.endFill();
 		}
 	}
 }
@@ -125,12 +148,14 @@ document.addEventListener("keypress", (event)=>{
 	if (event.key === "v") {
 		showVoronoi = !showVoronoi;
 	}
-	// if (event.key === "s") {
-	// 	triangulator.retriangulate(triangles, TriPoint.of(<any>points2.pop()));
-	// }
+	if (event.key === "s") {
+		relaxPoints();
+		doVoronoiStep();
+	}
 	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "s") {
 		redraw();
 	}
 });
 
+doVoronoiStep();
 redraw();
