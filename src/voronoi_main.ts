@@ -1,4 +1,4 @@
-import { Voronoi, VoronoiGridCell, DelaunayPoint } from "src/voronoi";
+import { Voronoi, VoronoiGridCell, DelaunayPoint, Vec2 } from "src/voronoi";
 import { DelaunayTriangulator, TriPoint, VorCell, cullVorCellsToArea, Triangle } from "src/voronoi2";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
@@ -22,10 +22,10 @@ viewport.drag().wheel().decelerate();
 
 let cells: VoronoiGridCell[] = [];
 let points: DelaunayPoint[] = [];
-let startX = -3;
-let startY = -3;
-let endX = 3;
-let endY = 3;
+let startX = -9;
+let startY = -9;
+let endX = 9;
+let endY = 9;
 for (let x = startX; x <= endX; x++) {
 	for (let y = startY; y <= endY; y++) {
 		cells.push(voronoi.addCell(x, y));
@@ -36,18 +36,16 @@ for (let cell of cells) {
 	points.push(...cell.delaunayPoints);
 }
 let graphic = new PIXI.Graphics();
-for (let point of points) {
-	graphic.beginFill(0xFF0000);
-	graphic.drawCircle(point.x+point.cell.x*voronoi.gridCellWidth,
-	                   point.y+point.cell.y*voronoi.gridCellWidth, 100);
-	graphic.endFill();
-}
 viewport.addChild(graphic);
 const triangulator = new DelaunayTriangulator();
 let points2 = voronoi.getPoints(startX, startY, endX, endY);
 let points3: TriPoint[] = [];
 let triangles: Triangle[] = [];
 let voronoiCells: VorCell[] = [];
+let triangulationStartX = startX*voronoi.gridCellWidth;
+let triangulationStartY = startY*voronoi.gridCellWidth;
+let triangulationEndX = endX*voronoi.gridCellWidth;
+let triangulationEndY = endY*voronoi.gridCellWidth;
 function doVoronoiStep() {
 	points3 = [];
 	for (let point of points2) {
@@ -55,8 +53,8 @@ function doVoronoiStep() {
 	}
 	triangles = triangulator.doTriangulation(
 		points3,
-		startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
-		endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+		triangulationStartX, triangulationStartY,
+		triangulationEndX, triangulationEndY);
 	voronoiCells = [];
 	for (let point of points3) {
 		let cell = VorCell.fromTriPoint(point);
@@ -70,13 +68,14 @@ function doVoronoiStep() {
 	endY -= 2;
 	voronoiCells = cullVorCellsToArea(voronoiCells,
 		startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
-		endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+		(endX+1)*voronoi.gridCellWidth, (endY+1)*voronoi.gridCellWidth);
 }
 
 function relaxPoints() {
 	points2 = [];
 	for (let cell of voronoiCells) {
-		// points2.push(cell)
+		let centroid = cell.getCentroid();
+		points2.push(new Vec2(centroid.x, centroid.y));
 	}
 }
 
@@ -91,6 +90,13 @@ let delaunayColor = 0xFF0000;
 let voronoiColor = 0x00FF00;
 
 function redraw() {
+	graphic.clear();
+	for (let point of points2) {
+		graphic.beginFill(0xFF0000);
+		graphic.drawCircle(point.x,
+							point.y, 100);
+		graphic.endFill();
+	}
 	graphic2.clear();
 	for (let triangle of triangles) {
 		if (showDelaunay) {
