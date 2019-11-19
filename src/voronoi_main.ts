@@ -1,4 +1,5 @@
 import { Voronoi, VoronoiGridCell, DelaunayPoint, Vec2 } from "src/voronoi";
+import { DelaunayTriangulator, TriPoint } from "src/voronoi2";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 
@@ -42,15 +43,21 @@ for (let point of points) {
 	graphic.endFill();
 }
 viewport.addChild(graphic);
-let triangles = voronoi.advanceRegionToRelaxations(startX, startY, endX, endY, 1);
-let voronoiEdges = voronoi.toVoronoi(triangles);
-let barycentricDualMesh = voronoi.toDualMesh(triangles, t=>{
-	let x = (t.vert1.x+t.vert2.x+t.vert3.x)/3;
-	let y = (t.vert1.y+t.vert2.y+t.vert3.y)/3;
-	return new Vec2(x, y);
-});
-voronoi.cleanup();
-voronoi.clean = true;
+const triangulator = new DelaunayTriangulator();
+let points2 = voronoi.getPoints(startX, startY, endX, endY);
+let triangles = triangulator.doTriangulation(
+	points2,
+	startX*voronoi.gridCellWidth, startY*voronoi.gridCellWidth,
+	endX*voronoi.gridCellWidth, endY*voronoi.gridCellWidth);
+// let triangles = voronoi.advanceRegionToRelaxations(startX, startY, endX, endY, 1);
+// let voronoiEdges = voronoi.toVoronoi(triangles);
+// let barycentricDualMesh = voronoi.toDualMesh(triangles, t=>{
+// 	let x = (t.vert1.x+t.vert2.x+t.vert3.x)/3;
+// 	let y = (t.vert1.y+t.vert2.y+t.vert3.y)/3;
+// 	return new Vec2(x, y);
+// });
+// voronoi.cleanup();
+// voronoi.clean = true;
 let graphic2 = new PIXI.Graphics();
 viewport.addChild(graphic2);
 
@@ -68,12 +75,12 @@ function redraw() {
 	for (let triangle of triangles) {
 		if (showDelaunay) {
 			graphic2.lineStyle(75, delaunayColor)
-					.moveTo(triangle.edge1.point1.x, triangle.edge1.point1.y)
-					.lineTo(triangle.edge1.point2.x, triangle.edge1.point2.y)
-					.moveTo(triangle.edge2.point1.x, triangle.edge2.point1.y)
-					.lineTo(triangle.edge2.point2.x, triangle.edge2.point2.y)
-					.moveTo(triangle.edge3.point1.x, triangle.edge3.point1.y)
-					.lineTo(triangle.edge3.point2.x, triangle.edge3.point2.y);
+					.moveTo(triangle.edge1.vert1.x, triangle.edge1.vert1.y)
+					.lineTo(triangle.edge1.vert2.x, triangle.edge1.vert2.y)
+					.moveTo(triangle.edge2.vert1.x, triangle.edge2.vert1.y)
+					.lineTo(triangle.edge2.vert2.x, triangle.edge2.vert2.y)
+					.moveTo(triangle.edge3.vert1.x, triangle.edge3.vert1.y)
+					.lineTo(triangle.edge3.vert2.x, triangle.edge3.vert2.y);
 		}
 		if (showCircles) {
 			let [ax, ay] = [triangle.vert1.x, triangle.vert1.y];
@@ -95,20 +102,20 @@ function redraw() {
 			graphic2.endFill();
 		}
 	}
-	if (showVoronoi) {
-		for (let edge of voronoiEdges) {
-			graphic2.lineStyle(75, voronoiColor)
-					.moveTo(edge.point1.x, edge.point1.y)
-					.lineTo(edge.point2.x, edge.point2.y);
-		}
-	}
-	if (showBarycentric) {
-		for (let edge of barycentricDualMesh) {
-			graphic2.lineStyle(75, barycentricColor)
-					.moveTo(edge.point1.x, edge.point1.y)
-					.lineTo(edge.point2.x, edge.point2.y);			
-		}
-	}
+	// if (showVoronoi) {
+	// 	for (let edge of voronoiEdges) {
+	// 		graphic2.lineStyle(75, voronoiColor)
+	// 				.moveTo(edge.point1.x, edge.point1.y)
+	// 				.lineTo(edge.point2.x, edge.point2.y);
+	// 	}
+	// }
+	// if (showBarycentric) {
+	// 	for (let edge of barycentricDualMesh) {
+	// 		graphic2.lineStyle(75, barycentricColor)
+	// 				.moveTo(edge.point1.x, edge.point1.y)
+	// 				.lineTo(edge.point2.x, edge.point2.y);			
+	// 	}
+	// }
 }
 
 document.addEventListener("keypress", (event)=>{
@@ -124,7 +131,11 @@ document.addEventListener("keypress", (event)=>{
 	if (event.key === "b") {
 		showBarycentric = !showBarycentric;
 	}
-	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "b") {
+	// if (event.key === "s") {
+	// 	triangulator.retriangulate(triangles, TriPoint.of(<any>points2.pop()));
+	// }
+	if (event.key === "c" || event.key === "d" || event.key === "v" || event.key === "b"
+	    || event.key === "s") {
 		redraw();
 	}
 });

@@ -206,6 +206,26 @@ export class Voronoi {
 	// 	this.retriangulate(this.triangles, <Vec2> this.pointsLeft.pop());
 	// }
 
+	getPoints(x1: number, y1: number, x2: number, y2: number): Vec2[] {
+		let points: Vec2[] = [];
+		for (let x = x1; x <= x2; x++) {
+			for (let y = y1; y <= y2; y++) {
+				// FIXME check that cells exist and have n-1 relaxations
+				// recurse if they don't have n-1 relaxations already.
+				let cell = this.grid.get(x+","+y);
+				if (cell == null) {
+					throw Error("nonexistent cell at " + x + ", " + y); //FIXME
+				}
+				// points.push(...cell.delaunayPoints);
+				for (let point of cell.delaunayPoints) {
+					let point2 = new Vec2(point.x+x*this.gridCellWidth, point.y+y*this.gridCellWidth);
+					points.push(point2);
+				}
+			}
+		}
+		return points;
+	}
+
 	advanceRegionToRelaxations(
 			x1: number, y1: number, x2: number, y2: number, relaxations: number): Triangle[] {
 		if (x2 < x1 || y2 < y1) {
@@ -223,22 +243,7 @@ export class Voronoi {
 					new Vec2((2+2*x2-x1)*this.gridCellWidth-1, y1*this.gridCellWidth-1),
 					new Vec2(x1*this.gridCellWidth-1, (2+2*y2-y1)*this.gridCellWidth-1)];
 		this.outerPoints = outerPoints;
-		let points: (Vec2 | DelaunayPoint)[] = [];
-		for (let x = x1; x <= x2; x++) {
-			for (let y = y1; y <= y2; y++) {
-				// FIXME check that cells exist and have n-1 relaxations
-				// recurse if they don't have n-1 relaxations already.
-				let cell = this.grid.get(x+","+y);
-				if (cell == null) {
-					throw Error("nonexistent cell at " + x + ", " + y); //FIXME
-				}
-				// points.push(...cell.delaunayPoints);
-				for (let point of cell.delaunayPoints) {
-					let point2 = new Vec2(point.x+x*this.gridCellWidth, point.y+y*this.gridCellWidth);
-					points.push(point2);
-				}
-			}
-		}
+		let points = this.getPoints(x1, y1, x2, y2);
 		let triangles: Triangle[] = [new Triangle(outerPoints[0], outerPoints[1], outerPoints[2])];
 		for (let point of points) {
 			this.retriangulate(triangles, point);
