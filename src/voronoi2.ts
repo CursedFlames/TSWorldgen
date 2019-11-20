@@ -4,10 +4,14 @@ export class Vec2 {
 	constructor(public x: number, public y: number) {}
 	
 	/**
-	 * Includes if exactly on edge.
+	 * Includes beginning of range, excludes end of range.
 	 */
-	inAreaInclusive(x1: number, y1: number, x2: number, y2: number): boolean {
-		return this.x >= x1 && this.x <= x2 && this.y >= y1 && this.y <= y2;
+	inArea(x1: number, y1: number, x2: number, y2: number): boolean {
+		return this.x >= x1 && this.x < x2 && this.y >= y1 && this.y < y2;
+	}
+
+	equals(other: Vec2): boolean {
+		return other.x === this.x && other.y === this.y;
 	}
 }
 
@@ -27,6 +31,29 @@ export class VorPoint extends Vec2 {
 		triangle.vorPoint = point;
 		return point;
 	}
+
+	// merge(other: VorPoint): void {
+	// 	if (other.x !== this.x || other.y !== this.y) {
+	// 		throw new Error("Attempted to merge two distinct Voronoi points");
+	// 	}
+	// 	outerloop:
+	// 	for (let edge of other.edges) {
+	// 		for (let edge2 of this.edges) {
+	// 			if (edge2 === edge) continue outerloop;
+	// 			if (edge.vert1.equals(edge2.vert1) && edge.vert2.equals(edge2.vert2)
+	// 					|| edge.vert2.equals(edge2.vert1) && edge.vert1.equals(edge2.vert2)) {
+	// 				edge2.merge(edge);
+	// 				continue outerloop;
+	// 			}
+	// 		}
+	// 		if (edge.vert1.equals(this)) {
+	// 			edge.vert1 = this;
+	// 		} else {
+	// 			edge.vert2 = this;
+	// 		}
+	// 		this.edges.push(edge);
+	// 	}
+	// }
 }
 
 export class VorEdge {
@@ -108,7 +135,7 @@ export class VorCell {
 	verts: VorPoint[] = [];
 	centroid?: Vec2;
 	isComplete: boolean = true;
-	private constructor(public point?: TriPoint) {}
+	private constructor(public point?: Vec2) {}
 	static fromTriPoint(point: TriPoint): VorCell | null {
 		if (point.vorCell !== undefined) {
 			console.warn("Tried to make Voronoi cell for point that already had a cell");
@@ -157,6 +184,7 @@ export class VorCell {
 			// blatantly copied from stackoverflow
 			// https://stackoverflow.com/a/6989383
 			// also inverted so that edges go in ccw order instead of cw
+			// it should be ccw, I think, at least. idk
 			if (a.x - center.x >= 0 && b.x - center.x < 0)
 				return 1;
 			if (a.x - center.x < 0 && b.x - center.x >= 0)
@@ -172,6 +200,25 @@ export class VorCell {
 			return -det;
 		});
 	}
+
+	destroy(): void {
+		
+	}
+
+	// merge(other: VorCell) {
+	// 	if ((this.point != null && other.point != null
+	// 			&& (other.point.x !== this.point.x || other.point.y !== this.point.y))
+	// 			|| this.verts.length !== other.verts.length || this.edges.length !== other.edges.length) {
+	// 		throw new Error("attempted to merge two distinct Voronoi cells");
+	// 	}
+	// 	for (let vert of other.verts) {
+	// 		for (let vert2 of this.verts) {
+	// 			if (vert.x === vert2.x && vert.y === vert2.y) {
+	// 				vert2.merge(vert);
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	getCentroid(): Vec2 {
 		if (this.centroid != null) {
@@ -292,12 +339,14 @@ export function cullVorCellsToArea(cells: VorCell[],
 		x1: number, y1: number, x2: number, y2: number): VorCell[] {
 	let outCells = [];
 	for (let cell of cells) {
-		for (let vert of cell.verts) {
-			if (vert.inAreaInclusive(x1, y1, x2, y2)) {
-				outCells.push(cell);
-				break;
-			}
-		}
+		if (cell.point != null && cell.point.inArea(x1, y1, x2, y2))
+			outCells.push(cell);
+		// for (let vert of cell.verts) {
+		// 	if (vert.inArea(x1, y1, x2, y2)) {
+		// 		outCells.push(cell);
+		// 		break;
+		// 	}
+		// }
 	}
 	return outCells;
 }
@@ -307,6 +356,7 @@ export class Triangle {
 	constructor(public vert1: TriPoint, public vert2: TriPoint, public vert3: TriPoint,
 		public edge1: TriEdge, public edge2: TriEdge, public edge3: TriEdge) {
 		// force counterclockwise triangle
+		// TODO doesn't seem to work?
 		if ((this.vert2.x - this.vert1.x)
 		   *(this.vert3.y - this.vert1.y)
 		   -(this.vert3.x - this.vert1.x)
@@ -343,7 +393,8 @@ export class Triangle {
 }
 
 export class DelaunayTriangulator {
-	doTriangulation(points: TriPoint[], startX: number, startY: number, endX: number, endY: number): Triangle[] {
+	static doTriangulation(points: TriPoint[],
+			startX: number, startY: number, endX: number, endY: number): Triangle[] {
 		let outerPoints = [
 			new TriPoint(startX-1, startY-1),
 			new TriPoint(4*endX-3*startX+1, startY-1),
@@ -363,7 +414,7 @@ export class DelaunayTriangulator {
 		return triangles; // TODO remove base triangle?
 	}
 
-	retriangulate(triangles: Triangle[], point: TriPoint): void {
+	static retriangulate(triangles: Triangle[], point: TriPoint): void {
 		let badTriangles = this.findInvalidatedTriangles(triangles, point);
 		let polygonHole = this.makePolygonHole(badTriangles);
 		for (let triangle of badTriangles) {
@@ -373,7 +424,7 @@ export class DelaunayTriangulator {
 		this.fillPolygonHole(triangles, point, polygonHole);
 	}
 
-	pointInCircumcircle(triangle: Triangle, point: Vec2): boolean {
+	static pointInCircumcircle(triangle: Triangle, point: Vec2): boolean {
 		// black magic
 		// assumes that triangle points are listed in counterclockwise order.
 		// let ax_ = triangle.vert1.x-point.x;
@@ -406,7 +457,7 @@ export class DelaunayTriangulator {
 		return dpx*dpx+dpy*dpy < r2;
 	}
 
-	findInvalidatedTriangles(triangles: Triangle[], point: Vec2): Triangle[] {
+	static findInvalidatedTriangles(triangles: Triangle[], point: Vec2): Triangle[] {
 		let badTriangles: Triangle[] = [];
 		for (let triangle of triangles) {
 			if (this.pointInCircumcircle(triangle, point)) {
@@ -416,7 +467,7 @@ export class DelaunayTriangulator {
 		return badTriangles;
 	}
 
-	makePolygonHole(badTriangles: Triangle[]): TriEdge[] {
+	static makePolygonHole(badTriangles: Triangle[]): TriEdge[] {
 		let polygonHole: TriEdge[] = [];
 		for (let triangle of badTriangles) {
 			let edges = [triangle.edge1, triangle.edge2, triangle.edge3];
@@ -440,11 +491,167 @@ export class DelaunayTriangulator {
 		return polygonHole;
 	}
 
-	fillPolygonHole(triangles: Triangle[], point: TriPoint, polygonHole: TriEdge[]) {
+	static fillPolygonHole(triangles: Triangle[], point: TriPoint, polygonHole: TriEdge[]) {
 		for (let edge of polygonHole) {
 			let triangle = new Triangle(edge.vert1, edge.vert2, point,
 				TriEdge.of(point, edge.vert2), TriEdge.of(point, edge.vert1), edge);
 			triangles.push(triangle);
 		}
+	}
+}
+
+export class VoronoiWorldCell {
+	points: Vec2[][] = [[]];
+	cells?: VorCell[];
+
+	constructor(x: number, y: number, numPoints: number) {
+		for (let i = 0; i < numPoints; i++) {
+			// TODO seeded random
+			let pointX = x+Math.random();
+			let pointY = y+Math.random();
+			this.points[0].push(new Vec2(pointX, pointY));
+		}
+	}
+}
+
+export class VoronoiWorldMap {
+	pointsPerCell: number = 5;
+	relaxations: number = 2;
+	grid: Map<string, VoronoiWorldCell> = new Map<string, VoronoiWorldCell>();
+
+	private extendsOutsideWorldCell(x: number, y: number, cell: VorCell): boolean {
+		for (let vert of cell.verts) {
+			if (vert.x < x || vert.x >= x+1 || vert.y < y || vert.y >= y+1) return true;
+		}
+		return false;
+	}
+
+	private neighbors(x: number, y: number): number[][] {
+		return [
+			[x-1, y-1],
+			[x-1, y],
+			[x-1, y+1],
+			[x, y-1],
+			[x, y+1],
+			[x+1, y-1],
+			[x+1, y],
+			[x+1, y+1]
+		];
+	}
+
+	// Edges disappear while using this, not sure why. Disabled for now.
+	// private tryJoinCells(oldCell: VorCell, newCell: VorCell): void {
+	// 	let connected = false;
+	// 	for (let vert of oldCell.verts) {
+	// 		for (let i = 0; i < newCell.verts.length; i++) {
+	// 			let vert2 = newCell.verts[i];
+	// 			if (vert.x === vert2.x && vert.y === vert2.y) {
+	// 				for (let edge of vert2.edges) {
+	// 					if (edge.vert1 == vert2) {
+	// 						edge.vert1 = vert;
+	// 					} else {
+	// 						edge.vert2 = vert;
+	// 					}
+	// 					if (vert.edges.indexOf(edge) === -1) {
+	// 						vert.edges.push(edge);
+	// 					}
+	// 				}
+	// 				newCell.verts[i] = vert;
+	// 				connected = true;
+	// 				break;
+	// 			}
+	// 		}
+	// 	}
+	// 	if (connected) {
+	// 		for (let edge of oldCell.edges) {
+	// 			for (let i = 0; i < newCell.edges.length; i++) {
+	// 				let edge2 = newCell.edges[i];
+	// 				// Can hopefully rely on this once vertices have been merged
+	// 				if (edge2.vert1 === edge.vert1 && edge2.vert2 === edge.vert2
+	// 						|| edge2.vert1 === edge.vert2 && edge2.vert2 === edge.vert1) {
+	// 					edge2.vert1.edges[edge2.vert1.edges.indexOf(edge2)] = edge;
+	// 					edge2.vert2.edges[edge2.vert2.edges.indexOf(edge2)] = edge;
+	// 					newCell.edges[i] = edge;
+	// 					break;
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	getCells(x: number, y: number): VorCell[] {
+		let worldCell = this.getWorldCell(x, y);
+		if (worldCell.cells != null) return worldCell.cells;
+		let cells = this.getCellsWithRelaxations(x, y, this.relaxations);
+		// let overlapCells = cells.filter(cell=>this.extendsOutsideWorldCell(x, y, cell));
+		// for (let neighbor of this.neighbors(x, y)) {
+		// 	let neighborCell = this.getWorldCell(neighbor[0], neighbor[1]);
+		// 	if (neighborCell.cells != null) {
+		// 		let neighborOverlap = neighborCell.cells.filter(
+		// 			cell=>this.extendsOutsideWorldCell(neighbor[0], neighbor[1], cell)
+		// 		);
+		// 		for (let neighborCell of neighborOverlap) {
+		// 			for (let cell of overlapCells) {
+		// 				this.tryJoinCells(neighborCell, cell);
+		// 			}
+		// 		}
+		// 	}
+		// }
+		worldCell.cells = cells;
+		return cells;
+	}
+
+	private getPointsWithRelaxations(
+			x1: number, y1: number, x2: number, y2: number, relaxations: number): Vec2[] {
+		// let worldCells = [];
+		let points: Vec2[] = [];
+		for (let x = x1; x <= x2; x++) {
+			for (let y = y1; y <= y2; y++) {
+				let worldCell = this.getWorldCell(x, y);
+				if (worldCell.points.length < relaxations+1) {
+					// TODO do we want to optimize this by doing an area instead of one cell?
+					let cells = this.getCellsWithRelaxations(x, y, relaxations-1);
+					let cellPoints = [];
+					for (let cell of cells) {
+						let centroid = cell.getCentroid();
+						if (centroid.x >= x && centroid.y >= y && centroid.x < x+1 && centroid.y < y+1)
+								cellPoints.push(cell.getCentroid());
+					}
+					worldCell.points.push(cellPoints);
+					points.push(...cellPoints);
+				} else {
+					points.push(...worldCell.points[relaxations]);
+				}
+			}
+		}
+		return points;
+	}
+
+	private getCellsWithRelaxations(x: number, y: number, relaxations: number): VorCell[] {
+		let points = this.getPointsWithRelaxations(x-2, y-2, x+2, y+2, relaxations);
+		let triPoints = [];
+		for (let point of points) {
+			triPoints.push(TriPoint.of(point));
+		}
+		let triangles = DelaunayTriangulator.doTriangulation(triPoints, x-2, y-2, x+2, y+2);
+		let cells = [];
+		for (let point of triPoints) {
+			let cell = VorCell.fromTriPoint(point);
+			if (cell != null) {
+				cells.push(cell);
+			}
+		}
+		cells = cullVorCellsToArea(cells, x, y, x+1, y+1);
+		return cells;
+	}
+
+	private getWorldCell(x: number, y: number): VoronoiWorldCell {
+		let key = x+","+y;
+		if (this.grid.has(key)) {
+			return <VoronoiWorldCell> this.grid.get(key);
+		}
+		let cell = new VoronoiWorldCell(x, y, this.pointsPerCell);
+		this.grid.set(key, cell);
+		return cell;
 	}
 }
