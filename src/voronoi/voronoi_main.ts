@@ -1,4 +1,4 @@
-import { VoronoiWorldMap, DelaunayTriangulator, TriPoint, VorCell, cullVorCellsToArea, Triangle } from "src/voronoi2";
+import { VoronoiWorldMap, DelaunayTriangulator, TriPoint, VorCell, cullVorCellsToArea, Triangle } from "src/voronoi/voronoi";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 

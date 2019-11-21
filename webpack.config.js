@@ -26,7 +26,10 @@ module.exports = {
 			path.resolve("./build"),
 			// path.resolve("./rot.js/dist"),
 			path.resolve("./node_modules")
-		]
+		],
+		alias: {
+			"three-examples": path.join(__dirname, "./node_modules/three/examples/js")
+		}
 	},
 	plugins: [
 		// new CircularDependencyPlugin({
@@ -44,8 +47,12 @@ module.exports = {
 // 			footer: ''
 // 		})
 	],
-	// module: {
-	// 	rules: [
+	module: {
+		rules: [
+			{
+				test: /three\/examples\/js/,
+				use: "imports-loader?THREE=three"
+			}
 				//left this here commented out because I'm too lazy to google documentation when I need this again
 			// {
 			// 	test: /\.js$/,
@@ -55,6 +62,6 @@ module.exports = {
 			// 		replace: ``
 			// 	}
 			// }
-	// 	]
-	// }
+		]
+	}
 };

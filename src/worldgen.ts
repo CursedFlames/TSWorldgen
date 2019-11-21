@@ -13,7 +13,15 @@ interface WorldgenData {
 }
 
 const snow = new Color(0xEEEEEE);
-const grass = new Color(0x22AA11);
+const grass = new Color(0x30EA17);
+const seafloor = new Color(0x333015);
+
+function getColor(height: number): Color {
+	if (height < 0) {
+		return seafloor.clone().lerpHSL(grass, Math.min(1, Math.max(0, height+1)));
+	}
+	return grass.clone().lerpHSL(snow, Math.min(1, Math.pow(Math.max(0, height), 1.5)))
+}
 
 const conf = {
 	base: 0,
@@ -159,7 +167,7 @@ export class Board {
 		for (let x = 0; x < width; x++) {
 			let col = [];
 			for (let y = 0; y < height; y++) {
-				col.push(grass.clone().lerpHSL(snow, Math.min(1, Math.pow(Math.max(0, this.heightmap[x][y]/20), 1.5))));
+				col.push(getColor(this.heightmap[x][y]/20));
 			}
 			this.colormap.push(col);
 		}
