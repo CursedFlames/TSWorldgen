@@ -11,7 +11,11 @@ export class Vec2 {
 	}
 
 	equals(other: Vec2): boolean {
-		return other.x === this.x && other.y === this.y;
+		// return other.x === this.x && other.y === this.y;
+		// this doesn't handle infinity but whatever
+		// hopefully this epsilon is big enough to not fail reasonably far out from 0,0, but not too big
+		// idk, it doesn't matter anyway, it's not like this will be used for anything important probably
+		return Math.abs(other.x-this.x) < 1E-9 && Math.abs(other.y-this.y) < 1E-9;
 	}
 }
 
@@ -59,6 +63,7 @@ export class VorPoint extends Vec2 {
 export class VorEdge {
 	cell1?: VorCell | null;
 	cell2?: VorCell | null;
+	color?: number; //FIXME remove debug
 	// TODO do we want a ref to the TriEdge here?
 
 	private constructor(public vert1: VorPoint, public vert2: VorPoint) {
@@ -135,6 +140,7 @@ export class VorCell {
 	verts: VorPoint[] = [];
 	centroid?: Vec2;
 	isComplete: boolean = true;
+	color?: number; //FIXME remove debug
 	private constructor(public point?: Vec2) {}
 	static fromTriPoint(point: TriPoint): VorCell | null {
 		if (point.vorCell !== undefined) {
@@ -335,22 +341,6 @@ export class TriEdge {
 	}
 }
 
-export function cullVorCellsToArea(cells: VorCell[],
-		x1: number, y1: number, x2: number, y2: number): VorCell[] {
-	let outCells = [];
-	for (let cell of cells) {
-		if (cell.point != null && cell.point.inArea(x1, y1, x2, y2))
-			outCells.push(cell);
-		// for (let vert of cell.verts) {
-		// 	if (vert.inArea(x1, y1, x2, y2)) {
-		// 		outCells.push(cell);
-		// 		break;
-		// 	}
-		// }
-	}
-	return outCells;
-}
-
 export class Triangle {
 	vorPoint?: VorPoint;
 	constructor(public vert1: TriPoint, public vert2: TriPoint, public vert3: TriPoint,
@@ -503,6 +493,7 @@ export class DelaunayTriangulator {
 export class VoronoiWorldCell {
 	points: Vec2[][] = [[]];
 	cells?: VorCell[];
+	allOverlappingCells?: VorCell[];
 
 	constructor(x: number, y: number, numPoints: number) {
 		for (let i = 0; i < numPoints; i++) {
@@ -539,66 +530,161 @@ export class VoronoiWorldMap {
 		];
 	}
 
-	// Edges disappear while using this, not sure why. Disabled for now.
-	// private tryJoinCells(oldCell: VorCell, newCell: VorCell): void {
-	// 	let connected = false;
-	// 	for (let vert of oldCell.verts) {
-	// 		for (let i = 0; i < newCell.verts.length; i++) {
-	// 			let vert2 = newCell.verts[i];
-	// 			if (vert.x === vert2.x && vert.y === vert2.y) {
-	// 				for (let edge of vert2.edges) {
-	// 					if (edge.vert1 == vert2) {
-	// 						edge.vert1 = vert;
-	// 					} else {
-	// 						edge.vert2 = vert;
-	// 					}
-	// 					if (vert.edges.indexOf(edge) === -1) {
-	// 						vert.edges.push(edge);
-	// 					}
-	// 				}
-	// 				newCell.verts[i] = vert;
-	// 				connected = true;
-	// 				break;
-	// 			}
-	// 		}
-	// 	}
-	// 	if (connected) {
-	// 		for (let edge of oldCell.edges) {
-	// 			for (let i = 0; i < newCell.edges.length; i++) {
-	// 				let edge2 = newCell.edges[i];
-	// 				// Can hopefully rely on this once vertices have been merged
-	// 				if (edge2.vert1 === edge.vert1 && edge2.vert2 === edge.vert2
-	// 						|| edge2.vert1 === edge.vert2 && edge2.vert2 === edge.vert1) {
-	// 					edge2.vert1.edges[edge2.vert1.edges.indexOf(edge2)] = edge;
-	// 					edge2.vert2.edges[edge2.vert2.edges.indexOf(edge2)] = edge;
-	// 					newCell.edges[i] = edge;
-	// 					break;
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-
 	getCells(x: number, y: number): VorCell[] {
 		let worldCell = this.getWorldCell(x, y);
-		if (worldCell.cells != null) return worldCell.cells;
-		let cells = this.getCellsWithRelaxations(x, y, this.relaxations);
-		// let overlapCells = cells.filter(cell=>this.extendsOutsideWorldCell(x, y, cell));
-		// for (let neighbor of this.neighbors(x, y)) {
-		// 	let neighborCell = this.getWorldCell(neighbor[0], neighbor[1]);
-		// 	if (neighborCell.cells != null) {
-		// 		let neighborOverlap = neighborCell.cells.filter(
-		// 			cell=>this.extendsOutsideWorldCell(neighbor[0], neighbor[1], cell)
-		// 		);
-		// 		for (let neighborCell of neighborOverlap) {
-		// 			for (let cell of overlapCells) {
-		// 				this.tryJoinCells(neighborCell, cell);
-		// 			}
-		// 		}
-		// 	}
-		// }
-		worldCell.cells = cells;
-		return cells;
+		if (worldCell.cells != null) {console.log("aaaa");return worldCell.cells;}
+		let allCells = this.getCellsWithRelaxations(x, y, this.relaxations);
+		let allNeighborCells: VorCell[] = [];
+		for (let neighbor of this.neighbors(x, y)) {
+			let neighborWorldCell = this.getWorldCell(neighbor[0], neighbor[1]);
+			if (neighborWorldCell.cells != null) {
+				allNeighborCells.push(...neighborWorldCell.allOverlappingCells);
+			}
+		}
+		// let processedCells = new Set<VorCell>(); // shouldn't need this, they should all be unique anyway
+		// when porting java, do Set.fromMap(IdentityHashMap) or whatever
+		let processedNeighborVerts = new Set<VorPoint>();
+
+		// remember to use IdentityHashMap when porting to java!
+		let cellsRemap = new Map<VorCell, VorCell>();
+		let edgesRemap = new Map<VorEdge, VorEdge>();
+		let vertsRemap = new Map<VorPoint, VorPoint>();
+
+		let cellsToRemap: VorCell[] = [];
+		let edgesToRemap: VorEdge[] = [];
+		let vertsToRemap: VorPoint[] = [];
+
+		let allCellsOut: VorCell[] = [];
+		let withinWorldCellOut: VorCell[] = [];
+
+		for (let cell of allCells) {
+			let foundMatch = false;
+			let addedCell = cell;
+			let processedNeighborCells = new Set<VorCell>();
+			for (let neighborCell of allNeighborCells) {
+				// TODO this is a stupid way of removing duplicates
+				if (processedNeighborCells.has(neighborCell)) {
+					continue;
+				}
+				processedNeighborCells.add(neighborCell);
+				if (cell.getCentroid().equals(neighborCell.getCentroid())) {
+					addedCell = neighborCell;
+					cellsRemap.set(cell, neighborCell);
+					cellsToRemap.push(neighborCell);
+
+					for (let vert of cell.verts) {
+						for (let vert2 of neighborCell.verts) {
+							if (vert.equals(vert2)) {
+								vertsRemap.set(vert, vert2);
+								if (processedNeighborVerts.has(vert2)) {
+									break;
+								}
+								processedNeighborVerts.add(vert2);
+								let edgesAdded = false;
+								for (let edge of vert.edges) {
+									if (vert2.edges.indexOf(edge) === -1) {
+										vert2.edges.push(edge);
+										edgesAdded = true;
+									}
+								}
+								if (edgesAdded) {
+									vertsToRemap.push(vert2);
+								}
+								break;
+							}
+						}
+					}
+					for (let edge of cell.edges) {
+						for (let edge2 of neighborCell.edges) {
+							let equal = edge.vert1.equals(edge2.vert2) && edge.vert2.equals(edge2.vert1);
+							if (equal) {
+								edge.vert1, edge.vert2 = edge.vert2, edge.vert1;
+							}
+							equal = equal || edge.vert1.equals(edge2.vert1) && edge.vert2.equals(edge2.vert2);
+							if (equal) {
+								edgesRemap.set(edge, edge2);
+								if (edge2.cell2 == null/* && (edge.cell1 != edge2.cell1 || edge.cell2 != null)*/) {
+									if (edge.cell1 === edge2.cell1) {
+										edge2.cell2 = edge.cell2;
+									} else {
+										edge2.cell2 = edge.cell1;
+									}
+									edgesToRemap.push(edge2);
+								}
+								break;
+							}
+						}
+					}
+
+					foundMatch = true;
+					break;
+				}
+			}
+			// if (!foundMatch) {
+				cellsToRemap.push(cell);
+			// }
+			allCellsOut.push(addedCell);
+			if (addedCell.getCentroid().inArea(x, y, x+1, y+1)) {
+				withinWorldCellOut.push(addedCell);
+			}
+		}
+
+		console.log(cellsRemap);
+		console.log(edgesRemap);
+		console.log(vertsRemap);
+
+		for (let cell of allCellsOut) {
+			for (let i = 0; i < cell.verts.length; i++) {
+				let vert = cell.verts[i];
+				if (vertsRemap.has(vert)) {
+					cell.verts[i] = <VorPoint> vertsRemap.get(vert);
+				}
+			}
+			for (let i = 0; i < cell.edges.length; i++) {
+				let edge = cell.edges[i];
+				if (edgesRemap.has(edge)) {
+					cell.edges[i] = <VorEdge> edgesRemap.get(edge);
+				}
+			}
+		}
+
+		for (let edge of edgesToRemap) {
+			if (edge.cell1 != null && cellsRemap.has(edge.cell1)) {
+				edge.cell1 = cellsRemap.get(edge.cell1);
+			}
+			if (edge.cell2 != null && cellsRemap.has(edge.cell2)) {
+				edge.cell2 = cellsRemap.get(edge.cell2);
+			}
+			if (vertsRemap.has(edge.vert1)) {
+				edge.vert1 = <VorPoint> vertsRemap.get(edge.vert1);
+			}
+			if (vertsRemap.has(edge.vert2)) {
+				edge.vert2 = <VorPoint> vertsRemap.get(edge.vert2);
+			}
+		}
+
+		for (let vert of vertsToRemap) {
+			for (let i = 0; i < vert.edges.length; i++) {
+				let edge = vert.edges[i];
+				if (edgesRemap.has(edge)) {
+					vert.edges[i] = <VorEdge> edgesRemap.get(edge);
+				}
+			}
+		}
+
+		worldCell.allOverlappingCells = allCellsOut;
+		worldCell.cells = withinWorldCellOut;
+		console.log(worldCell.cells.length);
+		for (let cell of withinWorldCellOut) {
+			cell.color = Math.floor(Math.random()*0x1000000);
+			for (let edge of cell.edges) {
+				if (edge.color == null) {
+					edge.color = Math.floor(Math.random()*0x1000000);
+				}
+			}
+		}
+
+		return withinWorldCellOut;
 	}
 
 	private getPointsWithRelaxations(
@@ -641,8 +727,24 @@ export class VoronoiWorldMap {
 				cells.push(cell);
 			}
 		}
-		cells = cullVorCellsToArea(cells, x, y, x+1, y+1);
-		return cells;
+		let allOverlappingCells = [];
+		// check if rectangle around polygon is within, to prevent missing slightly overlapping polys
+		for (let cell of cells) {
+			let xWithin = false, yWithin = false;
+			for (let vert of cell.verts) {
+				if (vert.x >= x && vert.x <= x+1) {
+					xWithin = true;
+				}
+				if (vert.y >= y && vert.y <= y+1) {
+					yWithin = true;
+				}
+				if (xWithin && yWithin) {
+					allOverlappingCells.push(cell);
+					break;
+				}
+			}
+		}
+		return allOverlappingCells;
 	}
 
 	private getWorldCell(x: number, y: number): VoronoiWorldCell {

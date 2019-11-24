@@ -1,4 +1,4 @@
-import { VoronoiWorldMap, DelaunayTriangulator, TriPoint, VorCell, cullVorCellsToArea, Triangle } from "src/voronoi/voronoi";
+import { VoronoiWorldMap } from "src/voronoi/voronoi";
 import * as Viewport from "pixi-viewport";
 import * as PIXI from "pixi.js";
 
@@ -36,13 +36,14 @@ function redraw() {
 	graphic.clear();
 	if (showVoronoi) {
 		for (let cell of cells) {
-			let color = Math.floor(Math.random()*0x1000000);
+			let color = cell.color || 0xFFFFFF;//Math.floor(Math.random()*0x1000000);
 			for (let edge of cell.edges) {
-				graphic.lineStyle(75, color)
+				graphic.lineStyle(75, edge.color || 0xFFFFFF)
 						.moveTo(edge.vert1.x*8192, edge.vert1.y*8192)
 						.lineTo(edge.vert2.x*8192, edge.vert2.y*8192);
 			}
 			let centroid = cell.getCentroid();
+			graphic.lineStyle(0);
 			graphic.beginFill(color);
 			graphic.drawCircle(centroid.x*8192, centroid.y*8192, 100);
 			graphic.endFill();
