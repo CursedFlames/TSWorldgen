@@ -8,6 +8,19 @@ const viewport = new Viewport({
 	screenWidth: window.innerWidth,
 	screenHeight: window.innerHeight
 });
+let onResize = ()=>{
+	var w = window.innerWidth;
+	var h = window.innerHeight;
+
+	//this part resizes the canvas but keeps ratio the same
+	app.renderer.view.style.width = w + "px";
+	app.renderer.view.style.height = h + "px";
+
+	//this part adjusts the ratio:
+	app.renderer.resize(w,h);
+}
+window.addEventListener("resize", onResize, false);
+onResize();
 
 const voronoi = new VoronoiWorldMap();
 
@@ -36,7 +49,7 @@ function redraw() {
 	graphic.clear();
 	if (showVoronoi) {
 		for (let cell of cells) {
-			let color = cell.color || 0xFFFFFF;//Math.floor(Math.random()*0x1000000);
+			let color = cell.color || 0xFFFFFF;
 			for (let edge of cell.edges) {
 				graphic.lineStyle(75, edge.color || 0xFFFFFF)
 						.moveTo(edge.vert1.x*8192, edge.vert1.y*8192)
@@ -68,6 +81,7 @@ document.addEventListener("keypress", (event)=>{
 		posX += 1;
 	}
 	if (event.key === "w" || event.key === "a" || event.key === "s" || event.key === "d") {
+		// add already included cells as well, so we can see if they're conflicting with other cell's edges
 		cells.push(...voronoi.getCells(posX, posY));
 		redraw();
 	}

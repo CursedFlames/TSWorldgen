@@ -15,13 +15,13 @@ export class Vec2 {
 		// this doesn't handle infinity but whatever
 		// hopefully this epsilon is big enough to not fail reasonably far out from 0,0, but not too big
 		// idk, it doesn't matter anyway, it's not like this will be used for anything important probably
-		return Math.abs(other.x-this.x) < 1E-9 && Math.abs(other.y-this.y) < 1E-9;
+		// FIXME use a smaller epsilon instead of this debug one - use 1E-8 maybe?
+		return Math.abs(other.x-this.x) < 1E-6 && Math.abs(other.y-this.y) < 1E-6;
 	}
 }
 
 export class VorPoint extends Vec2 {
 	edges: VorEdge[] = [];
-	// TODO do we want a ref to the Triangle here?
 	// static of(point: Vec2): VorPoint {
 	// 	return new VorPoint(point.x, point.y);
 	// }
@@ -35,29 +35,6 @@ export class VorPoint extends Vec2 {
 		triangle.vorPoint = point;
 		return point;
 	}
-
-	// merge(other: VorPoint): void {
-	// 	if (other.x !== this.x || other.y !== this.y) {
-	// 		throw new Error("Attempted to merge two distinct Voronoi points");
-	// 	}
-	// 	outerloop:
-	// 	for (let edge of other.edges) {
-	// 		for (let edge2 of this.edges) {
-	// 			if (edge2 === edge) continue outerloop;
-	// 			if (edge.vert1.equals(edge2.vert1) && edge.vert2.equals(edge2.vert2)
-	// 					|| edge.vert2.equals(edge2.vert1) && edge.vert1.equals(edge2.vert2)) {
-	// 				edge2.merge(edge);
-	// 				continue outerloop;
-	// 			}
-	// 		}
-	// 		if (edge.vert1.equals(this)) {
-	// 			edge.vert1 = this;
-	// 		} else {
-	// 			edge.vert2 = this;
-	// 		}
-	// 		this.edges.push(edge);
-	// 	}
-	// }
 }
 
 export class VorEdge {
@@ -70,17 +47,6 @@ export class VorEdge {
 		vert1.edges.push(this);
 		vert2.edges.push(this);
 	}
-
-	// static of(vert1: VorPoint, vert2: VorPoint): VorEdge {
-	// 	// If we used numerical ids we could have a dict instead of doing this check - would it be worth it?
-	// 	for (let edge of vert1.edges) {
-	// 		if (edge.vert1 === vert1 && edge.vert2 === vert2
-	// 				|| edge.vert1 === vert2 && edge.vert2 === vert1) {
-	// 			return edge;
-	// 		}
-	// 	}
-	// 	return new VorEdge(vert1, vert2);
-	// }
 
 	static fromTriEdge(triEdge: TriEdge): VorEdge | null {
 		if (triEdge.vorEdge !== undefined) {
@@ -206,25 +172,6 @@ export class VorCell {
 			return -det;
 		});
 	}
-
-	destroy(): void {
-		
-	}
-
-	// merge(other: VorCell) {
-	// 	if ((this.point != null && other.point != null
-	// 			&& (other.point.x !== this.point.x || other.point.y !== this.point.y))
-	// 			|| this.verts.length !== other.verts.length || this.edges.length !== other.edges.length) {
-	// 		throw new Error("attempted to merge two distinct Voronoi cells");
-	// 	}
-	// 	for (let vert of other.verts) {
-	// 		for (let vert2 of this.verts) {
-	// 			if (vert.x === vert2.x && vert.y === vert2.y) {
-	// 				vert2.merge(vert);
-	// 			}
-	// 		}
-	// 	}
-	// }
 
 	getCentroid(): Vec2 {
 		if (this.centroid != null) {
@@ -510,12 +457,12 @@ export class VoronoiWorldMap {
 	relaxations: number = 2;
 	grid: Map<string, VoronoiWorldCell> = new Map<string, VoronoiWorldCell>();
 
-	private extendsOutsideWorldCell(x: number, y: number, cell: VorCell): boolean {
-		for (let vert of cell.verts) {
-			if (vert.x < x || vert.x >= x+1 || vert.y < y || vert.y >= y+1) return true;
-		}
-		return false;
-	}
+	// private extendsOutsideWorldCell(x: number, y: number, cell: VorCell): boolean {
+	// 	for (let vert of cell.verts) {
+	// 		if (vert.x < x || vert.x >= x+1 || vert.y < y || vert.y >= y+1) return true;
+	// 	}
+	// 	return false;
+	// }
 
 	private neighbors(x: number, y: number): number[][] {
 		return [
@@ -532,7 +479,7 @@ export class VoronoiWorldMap {
 
 	getCells(x: number, y: number): VorCell[] {
 		let worldCell = this.getWorldCell(x, y);
-		if (worldCell.cells != null) {console.log("aaaa");return worldCell.cells;}
+		if (worldCell.cells != null) return worldCell.cells;
 		let allCells = this.getCellsWithRelaxations(x, y, this.relaxations);
 		let allNeighborCells: VorCell[] = [];
 		for (let neighbor of this.neighbors(x, y)) {
@@ -563,10 +510,10 @@ export class VoronoiWorldMap {
 			let processedNeighborCells = new Set<VorCell>();
 			for (let neighborCell of allNeighborCells) {
 				// TODO this is a stupid way of removing duplicates
-				if (processedNeighborCells.has(neighborCell)) {
-					continue;
-				}
-				processedNeighborCells.add(neighborCell);
+				// if (processedNeighborCells.has(neighborCell)) {
+				// 	continue;
+				// }
+				// processedNeighborCells.add(neighborCell);
 				if (cell.getCentroid().equals(neighborCell.getCentroid())) {
 					addedCell = neighborCell;
 					cellsRemap.set(cell, neighborCell);
@@ -629,10 +576,6 @@ export class VoronoiWorldMap {
 			}
 		}
 
-		console.log(cellsRemap);
-		console.log(edgesRemap);
-		console.log(vertsRemap);
-
 		for (let cell of allCellsOut) {
 			for (let i = 0; i < cell.verts.length; i++) {
 				let vert = cell.verts[i];
@@ -674,7 +617,8 @@ export class VoronoiWorldMap {
 
 		worldCell.allOverlappingCells = allCellsOut;
 		worldCell.cells = withinWorldCellOut;
-		console.log(worldCell.cells.length);
+
+		// FIXME remove debug
 		for (let cell of withinWorldCellOut) {
 			cell.color = Math.floor(Math.random()*0x1000000);
 			for (let edge of cell.edges) {
@@ -748,6 +692,7 @@ export class VoronoiWorldMap {
 	}
 
 	private getWorldCell(x: number, y: number): VoronoiWorldCell {
+		// when switching to java, use immutable Vec2i as key instead
 		let key = x+","+y;
 		if (this.grid.has(key)) {
 			return <VoronoiWorldCell> this.grid.get(key);
