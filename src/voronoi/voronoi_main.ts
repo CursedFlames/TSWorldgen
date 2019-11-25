@@ -38,6 +38,7 @@ let graphic = new PIXI.Graphics();
 viewport.addChild(graphic);
 
 let showVoronoi = true;
+let showGrid = false;
 
 let delaunayColor = 0xFF0000;
 let voronoiColor = 0x00FF00;
@@ -45,8 +46,30 @@ let voronoiColor = 0x00FF00;
 let posX = 0;
 let posY = 0;
 
+let minX = -3;
+let minY = -3;
+let maxX = 3;
+let maxY = 3;
+
 function redraw() {
 	graphic.clear();
+
+	if (showGrid) {
+		graphic.lineStyle(100, 0x555555);
+		for (let x = minX; x <= maxX; x++) {
+			for (let y = minY; y < maxY; y++) {
+				graphic.moveTo(x*8192, y*8192);
+				graphic.lineTo(x*8192, (y+1)*8192);
+			}
+		}
+		for (let x = minX; x < maxX; x++) {
+			for (let y = minY; y <= maxY; y++) {
+				graphic.moveTo(x*8192, y*8192);
+				graphic.lineTo((x+1)*8192, y*8192);
+			}
+		}
+	}
+
 	if (showVoronoi) {
 		for (let cell of cells) {
 			let color = cell.color || 0xFFFFFF;
@@ -68,6 +91,9 @@ document.addEventListener("keypress", (event)=>{
 	if (event.key === "v") {
 		showVoronoi = !showVoronoi;
 	}
+	if (event.key === "g") {
+		showGrid = !showGrid;
+	}
 	if (event.key === "w") {
 		posY -= 1;
 	}
@@ -85,7 +111,7 @@ document.addEventListener("keypress", (event)=>{
 		cells.push(...voronoi.getCells(posX, posY));
 		redraw();
 	}
-	if (event.key === "v") {
+	if (event.key === "v" || event.key === "g") {
 		redraw();
 	}
 });

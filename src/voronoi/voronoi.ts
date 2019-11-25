@@ -1,4 +1,4 @@
-
+import * as seedrandom from "seedrandom";
 
 export class Vec2 {
 	constructor(public x: number, public y: number) {}
@@ -443,10 +443,12 @@ export class VoronoiWorldCell {
 	allOverlappingCells?: VorCell[];
 
 	constructor(x: number, y: number, numPoints: number) {
+		// FIXME remove debugging seeding, and do it properly
+		let rand = seedrandom.alea("a"+x+","+y);
 		for (let i = 0; i < numPoints; i++) {
 			// TODO seeded random
-			let pointX = x+Math.random();
-			let pointY = y+Math.random();
+			let pointX = x+rand.double();
+			let pointY = y+rand.double();
 			this.points[0].push(new Vec2(pointX, pointY));
 		}
 	}
@@ -480,14 +482,21 @@ export class VoronoiWorldMap {
 	getCells(x: number, y: number): VorCell[] {
 		let worldCell = this.getWorldCell(x, y);
 		if (worldCell.cells != null) return worldCell.cells;
+
+		// console.log("getting cells at " + x + ", " + y);
+		
 		let allCells = this.getCellsWithRelaxations(x, y, this.relaxations);
 		let allNeighborCells: VorCell[] = [];
 		for (let neighbor of this.neighbors(x, y)) {
 			let neighborWorldCell = this.getWorldCell(neighbor[0], neighbor[1]);
-			if (neighborWorldCell.cells != null) {
+			if (neighborWorldCell.allOverlappingCells != null) {
 				allNeighborCells.push(...neighborWorldCell.allOverlappingCells);
+				// console.log("adding neighbor cells at " + neighbor[0] + ", " + neighbor[1]);
 			}
 		}
+
+		// Various processing to merge the two graphs together.
+
 		// let processedCells = new Set<VorCell>(); // shouldn't need this, they should all be unique anyway
 		// when porting java, do Set.fromMap(IdentityHashMap) or whatever
 		let processedNeighborVerts = new Set<VorPoint>();
@@ -518,7 +527,8 @@ export class VoronoiWorldMap {
 					addedCell = neighborCell;
 					cellsRemap.set(cell, neighborCell);
 					cellsToRemap.push(neighborCell);
-
+					foundMatch = true;
+				}
 					for (let vert of cell.verts) {
 						for (let vert2 of neighborCell.verts) {
 							if (vert.equals(vert2)) {
@@ -563,9 +573,8 @@ export class VoronoiWorldMap {
 						}
 					}
 
-					foundMatch = true;
-					break;
-				}
+					// break;
+				// }
 			}
 			// if (!foundMatch) {
 				cellsToRemap.push(cell);
@@ -627,7 +636,7 @@ export class VoronoiWorldMap {
 				}
 			}
 		}
-
+		// return allCellsOut; //debug
 		return withinWorldCellOut;
 	}
 
