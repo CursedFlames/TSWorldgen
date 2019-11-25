@@ -12,19 +12,16 @@ export class Vec2 {
 
 	equals(other: Vec2): boolean {
 		// return other.x === this.x && other.y === this.y;
+		
 		// this doesn't handle infinity but whatever
 		// hopefully this epsilon is big enough to not fail reasonably far out from 0,0, but not too big
 		// idk, it doesn't matter anyway, it's not like this will be used for anything important probably
-		// FIXME use a smaller epsilon instead of this debug one - use 1E-8 maybe?
-		return Math.abs(other.x-this.x) < 1E-6 && Math.abs(other.y-this.y) < 1E-6;
+		return Math.abs(other.x-this.x) < 1E-8 && Math.abs(other.y-this.y) < 1E-8;
 	}
 }
 
 export class VorPoint extends Vec2 {
 	edges: VorEdge[] = [];
-	// static of(point: Vec2): VorPoint {
-	// 	return new VorPoint(point.x, point.y);
-	// }
 	static fromTriangle(triangle: Triangle): VorPoint {
 		if (triangle.vorPoint != null) {
 			console.warn("Tried to make Voronoi point for triangle that already had a Voronoi point");
@@ -69,16 +66,6 @@ export class VorEdge {
 		return edge;
 	}
 
-	// /**
-	//  * Does *not* handle removal of cells, so this should only be called by VorCell.
-	//  */
-	// destroy(): void {
-	// 	let ind = this.vert1.edges.indexOf(this);
-	// 	if (ind !== -1) this.vert1.edges.splice(ind, 1);
-	// 	ind = this.vert2.edges.indexOf(this);
-	// 	if (ind !== -1) this.vert2.edges.splice(ind, 1);
-	// }
-
 	addCell(cell: VorCell): void {
 		if (this.cell1 == null) {
 			this.cell1 = cell; return;
@@ -88,17 +75,6 @@ export class VorEdge {
 			throw new Error("edge with three cells");
 		}
 	}
-	// Probably don't need this?
-	// removeCell(cell: VorCell): void {
-	// 	if (cell == this.cell1) {
-	// 		this.cell1 = this.cell2;
-	// 		this.cell2 = null;
-	// 	} else if (cell == this.cell2) {
-	// 		this.cell2 = null;
-	// 	} else {
-	// 		console.warn("Tried to cell triangle that isn't on edge");
-	// 	}
-	// }
 }
 
 export class VorCell {
@@ -294,12 +270,12 @@ export class Triangle {
 		public edge1: TriEdge, public edge2: TriEdge, public edge3: TriEdge) {
 		// force counterclockwise triangle
 		// TODO doesn't seem to work?
-		if ((this.vert2.x - this.vert1.x)
-		   *(this.vert3.y - this.vert1.y)
-		   -(this.vert3.x - this.vert1.x)
-		   *(this.vert2.y - this.vert1.y) <= 0) {
-			this.vert2, this.vert3 = this.vert3, this.vert2;
-		}
+		// if ((this.vert2.x - this.vert1.x)
+		//    *(this.vert3.y - this.vert1.y)
+		//    -(this.vert3.x - this.vert1.x)
+		//    *(this.vert2.y - this.vert1.y) <= 0) {
+		// 	this.vert2, this.vert3 = this.vert3, this.vert2;
+		// }
 		edge1.addTriangle(this);
 		edge2.addTriangle(this);
 		edge3.addTriangle(this);
@@ -364,6 +340,7 @@ export class DelaunayTriangulator {
 	static pointInCircumcircle(triangle: Triangle, point: Vec2): boolean {
 		// black magic
 		// assumes that triangle points are listed in counterclockwise order.
+		// commented out because it doesn't actually seem to work :shrug:
 		// let ax_ = triangle.vert1.x-point.x;
 		// let ay_ = triangle.vert1.y-point.ypolygonHoleFromBadTriangles;
 		// let bx_ = triangle.vert2.x-point.xpolygonHoleFromBadTriangles;
@@ -459,13 +436,6 @@ export class VoronoiWorldMap {
 	relaxations: number = 2;
 	grid: Map<string, VoronoiWorldCell> = new Map<string, VoronoiWorldCell>();
 
-	// private extendsOutsideWorldCell(x: number, y: number, cell: VorCell): boolean {
-	// 	for (let vert of cell.verts) {
-	// 		if (vert.x < x || vert.x >= x+1 || vert.y < y || vert.y >= y+1) return true;
-	// 	}
-	// 	return false;
-	// }
-
 	private neighbors(x: number, y: number): number[][] {
 		return [
 			[x-1, y-1],
@@ -487,6 +457,8 @@ export class VoronoiWorldMap {
 		
 		let allCells = this.getCellsWithRelaxations(x, y, this.relaxations);
 		let allNeighborCells: VorCell[] = [];
+		// want an identityset here too, in java.
+		let allNeighborCellsSet = new Set<VorCell>();
 		for (let neighbor of this.neighbors(x, y)) {
 			let neighborWorldCell = this.getWorldCell(neighbor[0], neighbor[1]);
 			if (neighborWorldCell.allOverlappingCells != null) {
@@ -495,7 +467,7 @@ export class VoronoiWorldMap {
 			}
 		}
 
-		// Various processing to merge the two graphs together.
+		// Various processing to merge the two graphs together. Lots of room for optimization
 
 		// let processedCells = new Set<VorCell>(); // shouldn't need this, they should all be unique anyway
 		// when porting java, do Set.fromMap(IdentityHashMap) or whatever
@@ -506,7 +478,7 @@ export class VoronoiWorldMap {
 		let edgesRemap = new Map<VorEdge, VorEdge>();
 		let vertsRemap = new Map<VorPoint, VorPoint>();
 
-		let cellsToRemap: VorCell[] = [];
+		// let cellsToRemap: VorCell[] = [];
 		let edgesToRemap: VorEdge[] = [];
 		let vertsToRemap: VorPoint[] = [];
 
@@ -526,7 +498,7 @@ export class VoronoiWorldMap {
 				if (cell.getCentroid().equals(neighborCell.getCentroid())) {
 					addedCell = neighborCell;
 					cellsRemap.set(cell, neighborCell);
-					cellsToRemap.push(neighborCell);
+					// cellsToRemap.push(neighborCell);
 					foundMatch = true;
 				}
 					for (let vert of cell.verts) {
@@ -577,7 +549,7 @@ export class VoronoiWorldMap {
 				// }
 			}
 			// if (!foundMatch) {
-				cellsToRemap.push(cell);
+				// cellsToRemap.push(cell);
 			// }
 			allCellsOut.push(addedCell);
 			if (addedCell.getCentroid().inArea(x, y, x+1, y+1)) {
