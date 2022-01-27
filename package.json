@@ -22,7 +22,7 @@
 		"pixi-viewport": "^3.6.4",
 		"pixi.js": "^4.8.2",
 		"seedrandom": "^3.0.5",
-		"three": "^0.106.2",
+		"three": "^0.137.0",
 		"ts-loader": "^6.0.4"
 	},
 	"scripts": {
